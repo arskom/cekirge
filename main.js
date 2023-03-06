@@ -39,7 +39,6 @@ const log = {
 
 const biara = (f) => {
     let delay_ms = (Math.random() * 10000) + 2000;
-    log.debug("delay(ms)=", delay_ms);
 
     return new Promise((resolve) => {
         setTimeout(() => { resolve(f()); }, delay_ms);

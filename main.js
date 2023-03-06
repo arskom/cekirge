@@ -21,9 +21,9 @@ const log = {
 
     fmt: {
         preamble: (contact, chat) => {
-            let retval = ("<" + contact.pushname.substring(0,10) + "> ").padStart(12);
+            let retval = ("<" + contact.pushname.substring(0,10) + ">").padStart(12);
             if (chat.isGroup) {
-                retval += ("("+ chat.name.substring(0,10) +")").padEnd(13);
+                retval += " " + ("("+ chat.name.substring(0,10) +")").padEnd(12);
             }
 
             return retval;
@@ -44,7 +44,6 @@ const biara = (f) => {
         setTimeout(() => { resolve(f()); }, delay_ms);
     });
 };
-
 
 // main
 const client = new Client({
@@ -69,15 +68,15 @@ client.on('message',async (message) => {
 
     if (message.body === '!alo') {
         await biara(() => { client.sendMessage(message.from, 'ne var'); });
-        log.command(preamble + "!alo");
+        log.command(preamble, "!alo");
     }
     else if (message.body === '!ping') {
         await biara(() => { message.reply('pong'); });
-        log.command(preamble + "!ping");
+        log.command(preamble, "!ping");
     }
     else if (message.body == '!nedir') {
         await biara(() => { message.reply(HELP); });
-        log.command(preamble + "!nedir");
+        log.command(preamble, "!nedir");
     }
 });
 

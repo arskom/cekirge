@@ -22,6 +22,15 @@ const log = {
     voice:   (...args) => { log.write("voice", ...args); },
 };
 
+const biara = (f) => {
+    let delay_ms = (Math.random() * 10000) + 2000;
+    log.debug("delay(ms)=", delay_ms);
+
+    return new Promise((resolve) => {
+        setTimeout(() => { resolve(f()); }, delay_ms);
+    });
+};
+
 
 // main
 const client = new Client({
@@ -41,13 +50,13 @@ client.on('message', message => {
     log.message(message);
 
     if (message.body === '!alo') {
-        client.sendMessage(message.from, 'ne var');
+        await biara(() => { client.sendMessage(message.from, 'ne var'); });
     }
     else if (message.body === '!ping') {
-        message.reply('pong');
+        await biara(() => { message.reply('pong'); });
     }
     else if (message.body == '!nedir') {
-        message.reply(HELP);
+        await biara(() => { message.reply(HELP); });
     }
 
 });

@@ -1,23 +1,38 @@
 
-const qrcode = require('qrcode-terminal');
+// preamble
+"use strict";
 
+const qrcode = require('qrcode-terminal');
 const { Client, LocalAuth } = require('whatsapp-web.js');
 
+// util
+const log = {
+    write: (ctx, ...args) => {
+        ctx = (ctx + "| ").padStart(10);
+        console.log(ctx, ...args);
+    },
+
+    message: (...args) => { log.write("message", ...args); },
+    status:  (...args) => { log.write("status", ...args); },
+    voice:   (...args) => { log.write("voice", ...args); },
+};
+
+// main
 const client = new Client({
-    authStrategy: new LocalAuth()
+    authStrategy: new LocalAuth(),
 });
 
 client.on('qr', (qr) => {
-    console.log('[status]   QR received!');
+    log.status("Got QR");
     qrcode.generate(qr, {small: true});
 });
 
 client.on('ready', () => {
-    console.log('[status]   Client is ready!');
+    log.status("Ready");
 });
 
 client.on('message', message => {
-    console.log('[message] ', message);
+    log.message(message);
 
     if (message.body === '!alo') {
         client.sendMessage(message.from, 'ne var');
@@ -29,10 +44,10 @@ client.on('message', message => {
 
 // example.js'den reject calls kodu
 client.on('call', async (call) => {
-    console.log('[voice]    Rejecting call', call);
+    log.voice('Rejecting call', call);
     await call.reject();
     await client.sendMessage(call.from, `[${call.fromMe ? 'Outgoing' : 'Incoming'}] Phone call from ${call.from}, type ${call.isGroup ? 'group' : ''} ${call.isVideo ? 'video' : 'audio'} call. ${rejectCalls ? 'This call was automatically rejected by the script.' : ''}`);
 });
 
-console.log("[status]   Boot");
+log.status("Boot");
 client.initialize();

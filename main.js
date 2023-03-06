@@ -25,8 +25,30 @@ const log = {
     },
 
     fmt: {
-        preamble: (contact, chat) => {
-            let retval = ("<" + contact.pushname.substring(0,10) + ">").padStart(12);
+        is_string: (s) => { return Object.prototype.toString.call(s) === '[object String]' },
+        timestamp: (t) => {
+            if (! (t instanceof Date)) {
+                t = new Date(t);
+            }
+            return t.toISOString().replace("T", " ").split(".")[0];
+        },
+
+        preamble: (message, contact, chat) => {
+            let retval = log.fmt.timestamp(message.timestamp * 1000);
+
+            let name = contact.pushname;
+            if (! log.fmt.is_string(name)) {
+                name = contact.name;
+            }
+            if (! log.fmt.is_string(name)) {
+                name = contact.number;
+            }
+            if (! log.fmt.is_string(name)) {
+                console.error("Unable to read contact name from:", contact);
+                name = "??????";
+            }
+
+            retval += " " + ("<" + name.substring(0,10) + ">").padStart(12);
             if (chat.isGroup) {
                 retval += " " + ("("+ chat.name.substring(0,10) +")").padEnd(12);
             }
@@ -51,6 +73,26 @@ const biara = (f) => {
 };
 
 /*
+ * commands
+ */
+
+const command = {
+    exists: (s) => { return (command[s] !== undefined); },
+
+    "!alo": async (message, contact, chat) => {
+        await biara(() => { client.sendMessage(message.from, 'ne var'); });
+    },
+
+    "!ping": async (message, contact, chat) => {
+        await biara(() => { message.reply('pong'); });
+    },
+
+    "!nedir": async (message, contact, chat) => {
+        await biara(() => { message.reply(HELP); });
+    },
+};
+
+/*
  * main
  */
 const client = new Client({
@@ -67,24 +109,34 @@ client.on('ready', async () => {
     await biara(() => { client.sendMessage(config.statusgroup, "hop"); });
 });
 
-client.on('message',async (message) => {
+client.on('message_create', async (message) => {
+    let cmdstr = message.body.split(" ")[0];
+    if (command.exists(cmdstr)) {
+        return;
+    }
+
     let chat = await message.getChat();
     let contact = await message.getContact();
-    let preamble = log.fmt.preamble(contact, chat)
-    log.message(preamble, message.body);
+    let preamble = log.fmt.preamble(message, contact, chat)
 
-    if (message.body === '!alo') {
-        await biara(() => { client.sendMessage(message.from, 'ne var'); });
-        log.command(preamble, "!alo");
+    log.message(preamble, message.body);
+});
+
+client.on('message', async (message) => {
+    if (message.fromMe) {
+        return;
     }
-    else if (message.body === '!ping') {
-        await biara(() => { message.reply('pong'); });
-        log.command(preamble, "!ping");
+
+    let cmdstr = message.body.split(" ")[0];
+    let handler = command[cmdstr];
+    if (handler === undefined) {
+        log.debug("Unknown command: ", cmdstr);
+        return;
     }
-    else if (message.body == '!nedir') {
-        await biara(() => { message.reply(HELP); });
-        log.command(preamble, "!nedir");
-    }
+
+    await handler(message, contact, chat);
+    log.command(preamble, command);
+
 });
 
 // example.js'den reject calls kodu

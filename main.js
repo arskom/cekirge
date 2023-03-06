@@ -14,7 +14,8 @@ const HELP = `Komutlar:
 
 const log = {
     write: (ctx, ...args) => {
-        ctx = (ctx + "| ").padStart(10);
+        ctx = (new Date().toISOString().replace("T", " ").split(".")[0])
+            + (ctx + "| ").padStart(10);
         console.log(ctx, ...args);
     },
 

@@ -1,16 +1,22 @@
 
 /*
- * preamble
+ * hazirlik
  */
 
 "use strict";
 
 const qrcode = require('qrcode-terminal');
 const { Client, LocalAuth } = require('whatsapp-web.js');
+const assert = require('node:assert');
+
 const config = require('./config.json');
+assert(config.usergroup !== undefined);
+assert(config.statusgroup !== undefined);
+
+const whitelist = [config.usergroup, config.statusgroup];
 
 /*
- * misc
+ * cercop
  */
 const HELP = `Komutlar:
  - *!ping*: alintili ping
@@ -48,7 +54,7 @@ const log = {
                 name = "??????";
             }
 
-            retval += " " + ("<" + name.substring(0,10) + ">").padStart(12);
+            retval += " " + ("<" + name.substring(0,12) + ">").padStart(14);
             if (chat.isGroup) {
                 retval += " " + ("("+ chat.name.substring(0,10) +")").padEnd(12);
             }
@@ -73,7 +79,7 @@ const biara = (f) => {
 };
 
 /*
- * commands
+ * komutlar
  */
 
 const command = {
@@ -111,7 +117,7 @@ client.on('ready', async () => {
 
 client.on('message_create', async (message) => {
     let cmdstr = message.body.split(" ")[0];
-    if (command.exists(cmdstr)) {
+    if (command.exists(cmdstr) && whitelist.includes(message.from)) {
         return;
     }
 
@@ -123,20 +129,23 @@ client.on('message_create', async (message) => {
 });
 
 client.on('message', async (message) => {
-    if (message.fromMe) {
-        return;
-    }
-
     let cmdstr = message.body.split(" ")[0];
     let handler = command[cmdstr];
     if (handler === undefined) {
-        log.debug("Unknown command: ", cmdstr);
         return;
     }
 
-    await handler(message, contact, chat);
-    log.command(preamble, command);
+    if (! whitelist.includes(message.from)) {
+        log.debug("Non-whitelisted sender:", message.from);
+        return;
+    }
 
+    let chat = await message.getChat();
+    let contact = await message.getContact();
+    let preamble = log.fmt.preamble(message, contact, chat)
+
+    await handler(message, contact, chat);
+    log.command(preamble, message.body);
 });
 
 // example.js'den reject calls kodu

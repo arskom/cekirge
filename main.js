@@ -1,12 +1,17 @@
 
-// preamble
+/*
+ * preamble
+ */
+
 "use strict";
 
 const qrcode = require('qrcode-terminal');
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const config = require('./config.json');
 
-// misc
+/*
+ * misc
+ */
 const HELP = `Komutlar:
  - *!ping*: alintili ping
  - *!alo*: alintisiz ping
@@ -45,7 +50,9 @@ const biara = (f) => {
     });
 };
 
-// main
+/*
+ * main
+ */
 const client = new Client({
     authStrategy: new LocalAuth(),
 });
@@ -87,6 +94,8 @@ client.on('call', async (call) => {
     await client.sendMessage(call.from, `[${call.fromMe ? 'Outgoing' : 'Incoming'}] Phone call from ${call.from}, type ${call.isGroup ? 'group' : ''} ${call.isVideo ? 'video' : 'audio'} call. ${rejectCalls ? 'This call was automatically rejected by the script.' : ''}`);
 });
 
-// boot
+/*
+ * boot
+ */
 log.status("Booting ...");
 client.initialize();

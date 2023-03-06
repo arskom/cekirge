@@ -10,10 +10,13 @@ const { Client, LocalAuth } = require('whatsapp-web.js');
 const assert = require('node:assert');
 
 const config = require('./config.json');
-assert(config.usergroup !== undefined);
 assert(config.statusgroup !== undefined);
 
-const whitelist = [config.usergroup, config.statusgroup];
+let whitelist = [config.statusgroup];
+if (config.usergroup !== undefined) {
+    whitelist.push(config.usergroup);
+}
+
 
 /*
  * cercop

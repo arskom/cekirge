@@ -17,9 +17,22 @@ const log = {
         console.log(ctx, ...args);
     },
 
+    fmt: {
+        preamble: (contact, chat) => {
+            let retval = ("<" + contact.pushname.substring(0,10) + "> ").padStart(12);
+            if (chat.isGroup) {
+                retval += ("("+ chat.name.substring(0,10) +")").padEnd(13);
+            }
+
+            return retval;
+        }
+    },
+
+    command: (...args) => { log.write("command", ...args); },
     message: (...args) => { log.write("message", ...args); },
     status:  (...args) => { log.write("status", ...args); },
     voice:   (...args) => { log.write("voice", ...args); },
+    debug:   (...args) => { log.write("debug", ...args); },
 };
 
 const biara = (f) => {
@@ -46,19 +59,24 @@ client.on('ready', () => {
     log.status("Ready");
 });
 
-client.on('message', message => {
-    log.message(message);
+client.on('message',async (message) => {
+    let chat = await message.getChat();
+    let contact = await message.getContact();
+    let preamble = log.fmt.preamble(contact, chat)
+    log.message(preamble, message.body);
 
     if (message.body === '!alo') {
         await biara(() => { client.sendMessage(message.from, 'ne var'); });
+        log.command(preamble + "!alo");
     }
     else if (message.body === '!ping') {
         await biara(() => { message.reply('pong'); });
+        log.command(preamble + "!ping");
     }
     else if (message.body == '!nedir') {
         await biara(() => { message.reply(HELP); });
+        log.command(preamble + "!nedir");
     }
-
 });
 
 // example.js'den reject calls kodu
@@ -68,5 +86,6 @@ client.on('call', async (call) => {
     await client.sendMessage(call.from, `[${call.fromMe ? 'Outgoing' : 'Incoming'}] Phone call from ${call.from}, type ${call.isGroup ? 'group' : ''} ${call.isVideo ? 'video' : 'audio'} call. ${rejectCalls ? 'This call was automatically rejected by the script.' : ''}`);
 });
 
-log.status("Boot");
+// boot
+log.status("Booting ...");
 client.initialize();

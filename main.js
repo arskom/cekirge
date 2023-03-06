@@ -64,7 +64,7 @@ client.on('qr', (qr) => {
 
 client.on('ready', async () => {
     log.status("Ready");
-    await biara(()=> { client.sendMessage(config.statusgroup, "hop"); });
+    await biara(() => { client.sendMessage(config.statusgroup, "hop"); });
 });
 
 client.on('message',async (message) => {

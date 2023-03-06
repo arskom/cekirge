@@ -5,7 +5,12 @@
 const qrcode = require('qrcode-terminal');
 const { Client, LocalAuth } = require('whatsapp-web.js');
 
-// util
+// misc
+const HELP = `Komutlar:
+ - *!ping*: alintili ping
+ - *!alo*: alintisiz ping
+`;
+
 const log = {
     write: (ctx, ...args) => {
         ctx = (ctx + "| ").padStart(10);
@@ -16,6 +21,7 @@ const log = {
     status:  (...args) => { log.write("status", ...args); },
     voice:   (...args) => { log.write("voice", ...args); },
 };
+
 
 // main
 const client = new Client({
@@ -40,6 +46,10 @@ client.on('message', message => {
     else if (message.body === '!ping') {
         message.reply('pong');
     }
+    else if (message.body == '!nedir') {
+        message.reply(HELP);
+    }
+
 });
 
 // example.js'den reject calls kodu

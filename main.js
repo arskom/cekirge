@@ -4,6 +4,7 @@
 
 const qrcode = require('qrcode-terminal');
 const { Client, LocalAuth } = require('whatsapp-web.js');
+const config = require('./config.json');
 
 // misc
 const HELP = `Komutlar:
@@ -55,8 +56,9 @@ client.on('qr', (qr) => {
     qrcode.generate(qr, {small: true});
 });
 
-client.on('ready', () => {
+client.on('ready', async () => {
     log.status("Ready");
+    await biara(()=> { client.sendMessage(config.statusgroup, "hop"); });
 });
 
 client.on('message',async (message) => {

@@ -5,10 +5,11 @@
 
 "use strict";
 
-const qrcode = require('qrcode-terminal');
 const {TvApiAdapter} = require('tradingview-api-adapter');
+const QRCode = require('qrcode-terminal');
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const assert = require('node:assert');
+const process = require('node:process');
 
 const config = require('./config.json');
 assert(config.statusgroup !== undefined);
@@ -146,11 +147,15 @@ const command = {
     },
 
     "!alo": async (message, contact, chat) => {
-        await biara(() => { client.sendMessage(message.from, 'ne var'); });
+        let retval = 'ne var';
+        await biara(() => { client.sendMessage(message.from, retval); });
+        return retval;
     },
 
     "!ping": async (message, contact, chat) => {
+        let retval = 'pong';
         await biara(() => { message.reply('pong'); });
+        return retval;
     },
 
     "!nedir": async (message, contact, chat) => {
@@ -159,7 +164,7 @@ const command = {
 };
 
 /*
- * main
+ * handlers
  */
 const client = new Client({
     authStrategy: new LocalAuth(),
@@ -167,7 +172,7 @@ const client = new Client({
 
 client.on('qr', (qr) => {
     log.status("Got QR");
-    qrcode.generate(qr, {small: true});
+    QRCode.generate(qr, {small: true});
 });
 
 client.on('ready', async () => {
@@ -204,8 +209,8 @@ client.on('message', async (message) => {
     let contact = await message.getContact();
     let preamble = log.fmt.preamble(message, contact, chat)
 
-    await handler(message, contact, chat);
-    log.command(preamble, message.body);
+    let ret = await handler(message, contact, chat);
+    log.command(preamble, message.body, "=>", ret.replaceAll("\n", "\\n"));
 });
 
 // example.js'den reject calls kodu
@@ -216,7 +221,38 @@ client.on('call', async (call) => {
 });
 
 /*
- * boot
+ * main
  */
-log.status("Booting ...");
-client.initialize();
+
+console.log(process.argv);
+if (process.argv.length == 3 && process.argv[2] === 'devel') {
+    log.status("Booting devel ...");
+    client.initialize();
+}
+else if (process.argv.length == 3 && process.argv[2] === 'prod') {
+    log.status("Booting prod ...");
+    log.debug = (...args) => {};
+    client.initialize();
+}
+else if (process.argv.length > 3 && process.argv[2] === 'cmd') {
+    let message = {
+        body: process.argv[3],
+        from: config.usergroup,
+        timestamp: (new Date()) / 1000,
+        reply: (s) => {},
+    };
+    let contact = {};
+    let chat = {};
+    let preamble = log.fmt.preamble(message, contact, chat)
+
+    let cmdstr = message.body.split(" ")[0];
+    let handler = command[cmdstr];
+    if (handler === undefined) {
+        log.command("ERROR: No handler found");
+    }
+    else {
+        handler(message, contact, chat).then((ret) => {
+            log.command(preamble, message.body, "=>", ret.replaceAll("\n", "\\n"));
+        });
+    }
+}

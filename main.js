@@ -90,6 +90,7 @@ const biara = (f) => {
  */
 
 const tview = {
+    // TODO: bu veriyi biyerden bulup doldurmak lazim
     sources: {
         BTCUSD: "BINANCE",
         XU100: "BIST",
@@ -101,6 +102,7 @@ const tview = {
             let quoter = (new TvApiAdapter()).Quote(symbol, source, ['lp', 'ch', 'chp']);
             quoter.listen(data => {
                 resolve(data);
+                // FIXME: quoter leak
             });
         });
 

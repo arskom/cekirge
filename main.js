@@ -135,6 +135,7 @@ const command = {
                 let hata = symbol + " icin kaynak tanimli degil";
                 log.command(hata);
                 await biara(() => { client.sendMessage(config.statusgroup, hata); });
+                return;
             }
 
             let data = await tview.get(symbol, source);

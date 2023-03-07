@@ -102,6 +102,7 @@ const tview = {
             let quoter = (new TvApiAdapter()).Quote(symbol, source, ['lp', 'ch', 'chp']);
             quoter.listen(data => {
                 resolve(data);
+                quoter.pause();
                 // FIXME: quoter leak
             });
         });

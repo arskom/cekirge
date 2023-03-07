@@ -1,4 +1,3 @@
 #!/bin/sh
 
-npm i whatsapp-web.js
-npm i qrcode-terminal
+npm i whatsapp-web.js qrcode-terminal tradingview-api-adapter

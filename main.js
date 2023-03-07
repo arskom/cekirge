@@ -6,6 +6,7 @@
 "use strict";
 
 const qrcode = require('qrcode-terminal');
+const {TvApiAdapter} = require('tradingview-api-adapter');
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const assert = require('node:assert');
 
@@ -21,9 +22,11 @@ if (config.usergroup !== undefined) {
 /*
  * cercop
  */
+
 const HELP = `Komutlar:
  - *!ping*: alintili ping
  - *!alo*: alintisiz ping
+ - *!tview* <symbol>:
 `;
 
 const log = {
@@ -82,11 +85,65 @@ const biara = (f) => {
 };
 
 /*
+ * tview
+ */
+
+const tview = {
+    sources: {
+        BTCUSD: "BINANCE",
+        XU100: "BIST",
+        USDTRY: "FX_IDC",
+    },
+
+    get: (symbol, source) => {
+        let retval = new Promise(resolve => {
+            let quoter = (new TvApiAdapter()).Quote(symbol, source, ['lp', 'ch', 'chp']);
+            quoter.listen(data => {
+                resolve(data);
+            });
+        });
+
+        return retval;
+    },
+};
+
+/*
  * komutlar
  */
 
 const command = {
     exists: (s) => { return (command[s] !== undefined); },
+
+    "!tview": async (message, contact, chat) => {
+        const args = message.body.split(' ').filter(s => s);
+        if (args.length < 2) {
+            let retval = "yanlis: " + message.body;
+            await biara(() => { client.sendMessage(config.statusgroup, retval); });
+            return;
+        }
+
+        let retval = '';
+        for (let i = 1; i < args.length; ++i) {
+            let symbol = args[i];
+
+            let source = tview.sources[symbol];
+            if (source === undefined) {
+                let hata = symbol + " icin kaynak tanimli degil";
+                log.command(hata);
+                await biara(() => { client.sendMessage(config.statusgroup, hata); });
+            }
+
+            let data = await tview.get(symbol, source);
+            log.debug(symbol, "response:", data);
+            if (i > 1) {
+                retval+= '\n';
+            }
+
+            retval += symbol + ': ' + data.lp;
+        }
+        await biara(() => { message.reply(retval); });
+        return retval;
+    },
 
     "!alo": async (message, contact, chat) => {
         await biara(() => { client.sendMessage(message.from, 'ne var'); });

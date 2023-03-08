@@ -128,7 +128,7 @@ const command = {
 
         let retval = '';
         for (let i = 1; i < args.length; ++i) {
-            let symbol = args[i];
+            let symbol = args[i].toUpperCase();
 
             let source = tview.sources[symbol];
             if (source === undefined) {

@@ -95,6 +95,8 @@ const tview = {
         BTCUSD: "BINANCE",
         XU100: "BIST",
         USDTRY: "FX_IDC",
+        EURTRY: "FX_IDC",
+        EURUSD: "FX_IDC",
     },
 
     get: (symbol, source) => {

@@ -18,7 +18,14 @@ let whitelist = [config.statusgroup];
 if (config.usergroup !== undefined) {
     whitelist.push(config.usergroup);
 }
+if (config.usergroups !== undefined) {
+    config.usergroups.forEach((e) => {
+        assert(typeof e === 'string');
+        whitelist.push(e);
+    });
+}
 
+console.log("whitelist:", whitelist);
 
 /*
  * cercop

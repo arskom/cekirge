@@ -1,0 +1,5 @@
+{
+    "statusgroup": "1234@g.us",
+    "usergroup": "5678@g.us",
+    "usergroups": ["1011@g.us", "1213@g.us"]
+}

@@ -216,7 +216,11 @@ client.on('message', async (message) => {
     let preamble = log.fmt.preamble(message, contact, chat)
 
     let ret = await handler(message, contact, chat);
-    log.command(preamble, message.body, "=>", ret.replaceAll("\n", "\\n"));
+    logret = 'undefined';
+    if (ret !== undefined) {
+        logret = ret.replaceAll("\n", "\\n");
+    }
+    log.command(preamble, message.body, "=>", logret);
 });
 
 // example.js'den reject calls kodu

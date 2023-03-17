@@ -223,7 +223,7 @@ client.on('message', async (message) => {
     let preamble = log.fmt.preamble(message, contact, chat)
 
     let ret = await handler(message, contact, chat);
-    logret = 'undefined';
+    let logret = 'undefined';
     if (ret !== undefined) {
         logret = ret.replaceAll("\n", "\\n");
     }

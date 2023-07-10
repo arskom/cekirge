@@ -3,6 +3,7 @@
  * hazirlik
  */
 
+
 "use strict";
 
 const {TvApiAdapter} = require('tradingview-api-adapter');
@@ -27,6 +28,8 @@ if (config.usergroups !== undefined) {
 
 console.log("whitelist:", whitelist);
 
+const qry_msg = require ('./db.js');
+const uuidv4 = require('uuid').v4;
 /*
  * cercop
  */
@@ -70,7 +73,11 @@ const log = {
 
             retval += " " + ("<" + name.substring(0,12) + ">").padStart(14);
             if (chat.isGroup) {
-                retval += " " + ("("+ chat.name.substring(0,10) +")").padEnd(12);
+                if (chat.name !== undefined) {
+                    retval += " " + ("("+ chat.name.substring(0,10) +")").padEnd(12);
+                } else {
+                    retval += " " + ("("+ "??????????" +")").padEnd(12);
+                }
             }
 
             return retval;
@@ -203,7 +210,10 @@ client.on('message_create', async (message) => {
     let contact = await message.getContact();
     let preamble = log.fmt.preamble(message, contact, chat)
 
-    log.message(preamble, message.body);
+    log.debug(message);
+    log.message(preamble, message.body); 
+    let rd_uuidv = uuidv4();   
+    qry_msg(message.body, rd_uuidv);
 });
 
 client.on('message', async (message) => {
@@ -228,6 +238,7 @@ client.on('message', async (message) => {
         logret = ret.replaceAll("\n", "\\n");
     }
     log.command(preamble, message.body, "=>", logret);
+
 });
 
 // example.js'den reject calls kodu
@@ -245,11 +256,15 @@ console.log(process.argv);
 if (process.argv.length == 3 && process.argv[2] === 'devel') {
     log.status("Booting devel ...");
     client.initialize();
+    //client.on('message', async msg => { msg });
+    // let getmsg = log.fmt(client.message.body);
+    //qry_msg(message);
 }
 else if (process.argv.length == 3 && process.argv[2] === 'prod') {
     log.status("Booting prod ...");
     log.debug = (...args) => {};
     client.initialize();
+
 }
 else if (process.argv.length > 3 && process.argv[2] === 'cmd') {
     let message = {

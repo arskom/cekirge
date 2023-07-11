@@ -213,7 +213,7 @@ client.on('message_create', async (message) => {
     log.debug(message);
     log.message(preamble, message.body); 
     let rd_uuidv = uuidv4();   
-    qry_msg(message.body, rd_uuidv);
+    qry_msg(message.body, rd_uuidv); //database imp demo
 });
 
 client.on('message', async (message) => {
@@ -256,9 +256,6 @@ console.log(process.argv);
 if (process.argv.length == 3 && process.argv[2] === 'devel') {
     log.status("Booting devel ...");
     client.initialize();
-    //client.on('message', async msg => { msg });
-    // let getmsg = log.fmt(client.message.body);
-    //qry_msg(message);
 }
 else if (process.argv.length == 3 && process.argv[2] === 'prod') {
     log.status("Booting prod ...");

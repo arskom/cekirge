@@ -15,17 +15,17 @@ const convertedForContent = {
     shaft512: "", //BLOB
 };
 
-function gmiForMain (uuid, message, folder) {
+function gmiForMain (UUid, folder, isRead, mimeID, datetime) {
     const convertedForMain = {
-        uuid: " ",
+        uuid: UUid,
         //in_reply_to: " ",
-        folder: "" ,
+        folder: "onat@arskom.net:apps/Chat/" + folder,
         read: 0,
         localState: "[{}]", //sabit
-        mimeID: " ",
-        mimeIRT: " ",
-        lastUpdate: " ",
-        wdate: " ",
+        mimeID: mimeID " ",
+        //mimeIRT: " ",
+        lastUpdate: datetime,
+        wdate: datetime,
         tzoffset: 0,
         files: " ",
         body_blob: " ",
@@ -46,6 +46,5 @@ function gmiForMain (uuid, message, folder) {
         in_reply_to = 
     }
     */
-    convertedForMain.folder = "onat@arskom.net:apps/Chat/" + folder;
-    
+    const sqlTime;
 }

@@ -213,10 +213,12 @@ client.on('message_create', async (message) => {
 
     log.debug(message);
     log.message(preamble, message.body); 
+
     let rd_uuidv = uuidv4();
     add_message_txn(message.body, rd_uuidv); //database imp demo
+    
     console.log((await message.getChat()).name);
-    console.log(MessageAck.ACK_READ);
+    console.log(MessageAck.ACK_READ, message.timestamp  );
 });
 
 client.on('message', async (message) => {

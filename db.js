@@ -1,9 +1,9 @@
 //database manipulasyonu icin burayi kullanacagim
 const sqlite3 = require('sqlite3').verbose();
 
-function openDatabase() {
+function openDatabase(str) {
   return new Promise((resolve, reject) => {
-    const db = new sqlite3.Database('./wwdata.db', sqlite3.OPEN_READWRITE, (err) => {
+    const db = new sqlite3.Database('/home/kene/data/profiles/onat@sobamail.com/' + str, sqlite3.OPEN_READWRITE, (err) => {
       if (err) {
         reject(err);
       } else {
@@ -27,21 +27,28 @@ function closeDatabase(db) {
   });
 }
 
-async function qry_msg(message, uuid) {
+async function add_message_txn (message, uuid) {
   try {
-    const db = await openDatabase();
-
-    console.log("DB AÇIK QRY FONKSİYONU ÇALIŞIYOR");
-    const escapedMessage = String.raw`${message}`;
-    const escapedUuid = String.raw`${uuid}`;
     console.log("message qry: " + message);
     console.log("uuid qry:" + uuid);
-    db.run("INSERT INTO messages (uuid, body) VALUES (?, ?)", [escapedUuid, escapedMessage]);
+    
+    const db_main = await openDatabase('main.db');
+    db_main.run("INSERT INTO messages (uuid) VALUES (?)", [uuid]);
+    await closeDatabase(db_main);
 
-    await closeDatabase(db);
+    const db_mbody = await openDatabase('mbody.db');
+    db_mbody.run("INSERT INTO messages (uuid, data, type) VALUES (?, ?, ?)", [uuid, String(message), 5]); //type icin 5 degeri tamamen sallama
+    await closeDatabase(db_mbody);
+
+    /*
+    const db_contents = await openDatabase('blob1/contents.db');
+    db_contents.run("INSERT INTO messages (uuid, data, type) VALUES (?, ?, ?)", [uuid, String(message), 5]); //type icin 5 degeri tamamen sallama
+    await closeDatabase(db_contents);
+    */
+  
   } catch (err) {
     console.error(err.message);
   }
 }
 
-module.exports = qry_msg;
+module.exports = add_message_txn;

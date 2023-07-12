@@ -28,7 +28,7 @@ if (config.usergroups !== undefined) {
 
 console.log("whitelist:", whitelist);
 
-const qry_msg = require ('./db.js');
+const add_message_txn = require ('./db.js');
 const uuidv4 = require('uuid').v4;
 /*
  * cercop
@@ -213,7 +213,7 @@ client.on('message_create', async (message) => {
     log.debug(message);
     log.message(preamble, message.body); 
     let rd_uuidv = uuidv4();   
-    qry_msg(message.body, rd_uuidv); //database imp demo
+    add_message_txn(message.body, rd_uuidv); //database imp demo
 });
 
 client.on('message', async (message) => {

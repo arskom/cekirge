@@ -8,7 +8,7 @@
 
 const {TvApiAdapter} = require('tradingview-api-adapter');
 const QRCode = require('qrcode-terminal');
-const { Client, LocalAuth } = require('whatsapp-web.js');
+const { Client, LocalAuth, MessageAck } = require('whatsapp-web.js');
 const assert = require('node:assert');
 const process = require('node:process');
 
@@ -29,6 +29,7 @@ if (config.usergroups !== undefined) {
 console.log("whitelist:", whitelist);
 
 const add_message_txn = require ('./db.js');
+//const getUuidFromData = require('./db.js');
 const uuidv4 = require('uuid').v4;
 /*
  * cercop
@@ -212,8 +213,10 @@ client.on('message_create', async (message) => {
 
     log.debug(message);
     log.message(preamble, message.body); 
-    let rd_uuidv = uuidv4();   
+    let rd_uuidv = uuidv4();
     add_message_txn(message.body, rd_uuidv); //database imp demo
+    console.log((await message.getChat()).name);
+    console.log(MessageAck.ACK_READ);
 });
 
 client.on('message', async (message) => {

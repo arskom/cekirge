@@ -51,4 +51,14 @@ async function add_message_txn (message, uuid) {
   }
 }
 
+/*
+async function getUuidFromData (quotedMsg) {
+  const db_mbody = await openDatabase('mbody.db');
+  const retval = db_mbody.get("SELECT uuid FROM messages WHERE mime_id = ?", [quotedMsg._serialized]);
+  await closeDatabase(db_mbody);
+  return retval;
+}
+*/  //VAKTI GELINCE DONULECEK!
+
 module.exports = add_message_txn;
+//module.exports = getUuidFromData;

@@ -27,17 +27,41 @@ function closeDatabase(db) {
   });
 }
 
-async function add_message_txn (message, uuid) {
+async function add_message_txn (message, uuid, folder) {
   try {
     console.log("message qry: " + message);
-    console.log("uuid qry:" + uuid);
-    
+    console.log("uuid qry: " + uuid);
+    console.log("chat name: " + folder);
     const db_main = await openDatabase('main.db');
-    db_main.run("INSERT INTO messages (uuid) VALUES (?)", [uuid]);
+
+    //const is_folderExist = db_main.get("SELECT CASE WHEN EXISTS (SELECT 1 FROM messages WHERE folder = ? ) THEN TRUE ELSE FALSE END", ['onat@arskom.net:apps/Chat/' + folder] );
+    /*
+    function is_folderExist (folder) {
+      const row = await db_main.get("SELECT CASE WHEN EXISTS (SELECT 1 FROM messages WHERE folder = ?) THEN 1 ELSE 0 END AS folder_exists;", ['onat@arskom.net:apps/Chat/' + folder] );
+      const boo = row.folder_exists === 1;
+      console.log("BU OBJE ICINDE:" + boo);
+      return boo;
+    } 
+    */
+
+    const row = await db_main.get("SELECT CASE WHEN EXISTS (SELECT 1 FROM messages WHERE folder = ?) THEN 1 ELSE 0 END AS folder_exists;", ['onat@arskom.net:apps/Chat/' + folder] );
+    const boo = row.folder_exists === 1;
+    console.log("row: " + row);
+    console.log("boo:" + boo);
+
+    if (!!boo){
+      db_main.run("INSERT INTO folders (name) VALUES (?)", ['onat@arskom.net:apps/Chat/' + folder]);
+    }
+    
+    //const checkFolder = is_folderExist(folder);
+    //console.log(is_folderExist(folder));
+
+
+    db_main.run("INSERT INTO messages (uuid, local_state) VALUES (?,?)", [uuid, '[{}]' ]);
     await closeDatabase(db_main);
 
-    const db_mbody = await openDatabase('mbody.db');
-    db_mbody.run("INSERT INTO messages (uuid, data, type) VALUES (?, ?, ?)", [uuid, String(message), 5]); //type icin 5 degeri tamamen sallama
+    const db_mbody = await openDatabase('mbody.db'); //DONE
+    db_mbody.run("INSERT INTO messages (uuid, data, type, enc) VALUES (?, ?, ?, ?)", [uuid, String(message), 2, 'UTF-8']);
     await closeDatabase(db_mbody);
 
     /*

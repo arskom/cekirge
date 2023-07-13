@@ -30,38 +30,76 @@ function closeDatabase(db) {
 async function add_message_txn (message, uuid, folder) {
   try {
     console.log("message qry: " + message);
-    console.log("uuid qry: " + uuid);
+    
     console.log("chat name: " + folder);
+
+    uuid = "{" + uuid + "}";
+    folder = 'onat@arskom.net:apps/Chat/' + folder;
+    console.log("uuid qry: " + uuid);
+    console.log("uuid qry type: " + typeof(uuid));
+    console.log(folder);
+
     const db_main = await openDatabase('main.db');
 
-    //const is_folderExist = db_main.get("SELECT CASE WHEN EXISTS (SELECT 1 FROM messages WHERE folder = ? ) THEN TRUE ELSE FALSE END", ['onat@arskom.net:apps/Chat/' + folder] );
-    /*
-    function is_folderExist (folder) {
-      const row = await db_main.get("SELECT CASE WHEN EXISTS (SELECT 1 FROM messages WHERE folder = ?) THEN 1 ELSE 0 END AS folder_exists;", ['onat@arskom.net:apps/Chat/' + folder] );
-      const boo = row.folder_exists === 1;
-      console.log("BU OBJE ICINDE:" + boo);
-      return boo;
-    } 
-    */
-
-    const row = await db_main.get("SELECT CASE WHEN EXISTS (SELECT 1 FROM messages WHERE folder = ?) THEN 1 ELSE 0 END AS folder_exists;", ['onat@arskom.net:apps/Chat/' + folder] );
-    const boo = row.folder_exists === 1;
-    console.log("row: " + row);
-    console.log("boo:" + boo);
-
-    if (!!boo){
-      db_main.run("INSERT INTO folders (name) VALUES (?)", ['onat@arskom.net:apps/Chat/' + folder]);
+    //folder yoksa uret
+    const row = await new Promise((resolve, reject) => {
+      db_main.get("SELECT CASE WHEN EXISTS (SELECT 1 FROM messages WHERE folder = ?) THEN 1 ELSE 0 END AS folder_exists;", [folder], (err, row) => {
+        if (err) {
+          reject (err);
+        }
+        else {
+          resolve(row);
+        }
+      })});
+    if (row.folder_exists !== 1){
+      db_main.run("INSERT INTO folders (name) VALUES (?)", [folder]);
     }
-    
-    //const checkFolder = is_folderExist(folder);
-    //console.log(is_folderExist(folder));
 
-
+    //messages tablosuna ekleme islemi
     db_main.run("INSERT INTO messages (uuid, local_state) VALUES (?,?)", [uuid, '[{}]' ]);
+
+    //eklenen mesajın uuid'si sayesinde id'sini cek, folder'in id'sini cek, ikisini msgfolders tablosuna ekle
+    const rows2 = await new Promise((resolve, reject) => {
+      db_main.get("SELECT id FROM messages WHERE uuid = ?;", [uuid], (err, row) => {
+        if (err) {
+          reject (err);
+        }
+        else {
+          resolve(row);
+        }
+      }
+    )});
+    console.log(rows2.id);
+
+    const folderID = await new Promise((resolve, reject) => {
+      db_main.get("SELECT id From folders WHERE name = ?", [folder], (err, row) => {
+        if (err) {
+          reject (err);
+        }
+        else {
+          resolve (row);
+        }
+      })
+    });
+    console.log(folderID.id);
+    
+    const insert2folders = await new Promise ((resolve, reject) => {
+      db_main.run("INSERT INTO msgfolders (mid, fid) VALUES (?,?)", [rows2.id, folderID.id], (err, row) => {
+        if (err) {
+          reject (err);
+        }
+        else {
+          resolve (row);
+        }
+      })
+    });
+
+
     await closeDatabase(db_main);
 
-    const db_mbody = await openDatabase('mbody.db'); //DONE
-    db_mbody.run("INSERT INTO messages (uuid, data, type, enc) VALUES (?, ?, ?, ?)", [uuid, String(message), 2, 'UTF-8']);
+    //mbody tablosuna bilgileri ekle. DONE!!!
+    const db_mbody = await openDatabase('mbody.db');
+      db_mbody.run("INSERT INTO messages (uuid, data, type, enc) VALUES (?, ?, ?, ?)", [uuid, String(message), 2, 'UTF-8']);
     await closeDatabase(db_mbody);
 
     /*

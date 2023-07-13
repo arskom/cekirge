@@ -43,6 +43,10 @@ async function add_message_txn (message, uuid, folder) {
 
     //folder yoksa uret
     const row = await new Promise((resolve, reject) => {
+
+      //messages tablosuna ekleme islemi
+      db_main.run("INSERT INTO messages (uuid, local_state) VALUES (?,?)", [uuid, '[{}]' ]);
+
       db_main.get("SELECT CASE WHEN EXISTS (SELECT 1 FROM messages WHERE folder = ?) THEN 1 ELSE 0 END AS folder_exists;", [folder], (err, row) => {
         if (err) {
           reject (err);
@@ -50,13 +54,15 @@ async function add_message_txn (message, uuid, folder) {
         else {
           resolve(row);
         }
-      })});
-    if (row.folder_exists !== 1){
-      db_main.run("INSERT INTO folders (name) VALUES (?)", [folder]);
-    }
+      })
+    });
+    
+    console.log("folder var mi: ", row.folder_exists);
 
-    //messages tablosuna ekleme islemi
-    db_main.run("INSERT INTO messages (uuid, local_state) VALUES (?,?)", [uuid, '[{}]' ]);
+    if (row.folder_exists !== 1){
+      const createFolder = db_main.run("INSERT INTO folders (name) VALUES (?)", [folder]);
+      console.log("if folder....... CALİSTİ");
+    }
 
     //eklenen mesajın uuid'si sayesinde id'sini cek, folder'in id'sini cek, ikisini msgfolders tablosuna ekle
     const rows2 = await new Promise((resolve, reject) => {
@@ -69,7 +75,7 @@ async function add_message_txn (message, uuid, folder) {
         }
       }
     )});
-    console.log(rows2.id);
+    console.log("mID: " + rows2.id);
 
     const folderID = await new Promise((resolve, reject) => {
       db_main.get("SELECT id From folders WHERE name = ?", [folder], (err, row) => {
@@ -81,7 +87,7 @@ async function add_message_txn (message, uuid, folder) {
         }
       })
     });
-    console.log(folderID.id);
+    console.log("fID: " + folderID.id);
     
     const insert2folders = await new Promise ((resolve, reject) => {
       db_main.run("INSERT INTO msgfolders (mid, fid) VALUES (?,?)", [rows2.id, folderID.id], (err, row) => {

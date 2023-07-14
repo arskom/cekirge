@@ -27,7 +27,7 @@ function closeDatabase(db) {
   });
 }
 
-async function add_message_txn (message, uuid, folder) {
+async function add_message_txn (message, uuid, folder, mimeID, timestamp) {
   try {
     console.log("message qry: " + message);
     
@@ -42,9 +42,9 @@ async function add_message_txn (message, uuid, folder) {
     const db_main = await openDatabase('main.db');
 
     //messages tablosuna ekleme islemi
-    db_main.run("INSERT INTO messages (uuid, local_state) VALUES (?,?)", [uuid, '[{}]']);
+    db_main.run("INSERT INTO messages (uuid, local_state, read, mime_id) VALUES (?,?, ?, ?)", [uuid, '[{}]', 0, mimeID]);
 
-    //folder yoksa uret
+    /* BURASI FOLDER HANDLING ---- BURASI FOLDER HANDLING ---- BURASI FOLDER HANDLING ---- BURASI FOLDER HANDLING ---- BURASI FOLDER HANDLING*/
     const row = await new Promise((resolve, reject) => {
       db_main.get("SELECT CASE WHEN EXISTS (SELECT 1 FROM folders WHERE name = ?) THEN 1 ELSE 0 END AS folder_exists;", [folder], (err, row) => {
         if (err) {
@@ -63,7 +63,6 @@ async function add_message_txn (message, uuid, folder) {
       console.log("if folder....... CALİSTİ");
     }
 
-    //eklenen mesajın uuid'si sayesinde id'sini cek, folder'in id'sini cek, ikisini msgfolders tablosuna ekle
     const rows2 = await new Promise((resolve, reject) => {
       db_main.get("SELECT id FROM messages WHERE uuid = ?;", [uuid], (err, row) => {
         if (err) {
@@ -98,6 +97,14 @@ async function add_message_txn (message, uuid, folder) {
         }
       })
     });
+    /* BURASI FOLDER HANDLING BITTI ---- BURASI FOLDER HANDLING BITTI ---- BURASI FOLDER HANDLING BITTI ---- BURASI FOLDER HANDLING BITTI */
+    
+    /* TIMESTAMP TO FORMAT ---- TIMESTAMP TO FORMAT ---- TIMESTAMP TO FORMAT ---- TIMESTAMP TO FORMAT ---- TIMESTAMP TO FORMAT ---- TIMESTAMP TO FORMAT */
+    const date = new Date(timestamp*1000);
+    const insertTime = await new Promise ((resolve, reject) => {
+      db_main.run
+    })
+    /* TIMESTAMP TO FORMAT BITTI ---- TIMESTAMP TO FORMAT BITTI ---- TIMESTAMP TO FORMAT BITTI ---- TIMESTAMP TO FORMAT BITTI ---- TIMESTAMP TO FORMAT BITTI */
 
     await closeDatabase(db_main);
 

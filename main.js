@@ -216,8 +216,8 @@ client.on('message_create', async (message) => {
 
     let rd_uuidv = uuidv4();
     console.log("CHAT NAME:" + chat.name);
-    add_message_txn(message.body, rd_uuidv, chat.name); //database imp demo
-    console.log(rd_uuidv, message.body, message.timestamp, chat.name, message._data.id._serialized);
+    add_message_txn(message.body, rd_uuidv, chat.name, message._data.id._serialized, message.timestamp); //database imp demo
+    console.log(rd_uuidv, message.body, message.timestamp, chat.name, message._data.id._serialized, message.timestamp);
 });
 
 client.on('message', async (message) => {

@@ -41,13 +41,12 @@ async function add_message_txn (message, uuid, folder) {
 
     const db_main = await openDatabase('main.db');
 
+    //messages tablosuna ekleme islemi
+    db_main.run("INSERT INTO messages (uuid, local_state) VALUES (?,?)", [uuid, '[{}]']);
+
     //folder yoksa uret
     const row = await new Promise((resolve, reject) => {
-
-      //messages tablosuna ekleme islemi
-      db_main.run("INSERT INTO messages (uuid, local_state) VALUES (?,?)", [uuid, '[{}]' ]);
-
-      db_main.get("SELECT CASE WHEN EXISTS (SELECT 1 FROM messages WHERE folder = ?) THEN 1 ELSE 0 END AS folder_exists;", [folder], (err, row) => {
+      db_main.get("SELECT CASE WHEN EXISTS (SELECT 1 FROM folders WHERE name = ?) THEN 1 ELSE 0 END AS folder_exists;", [folder], (err, row) => {
         if (err) {
           reject (err);
         }
@@ -99,7 +98,6 @@ async function add_message_txn (message, uuid, folder) {
         }
       })
     });
-
 
     await closeDatabase(db_main);
 

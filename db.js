@@ -29,20 +29,16 @@ function closeDatabase(db) {
 
 async function add_message_txn (message, uuid, folder, mimeID, timestamp) {
   try {
-    console.log("message qry: " + message);
-    
-    console.log("chat name: " + folder);
 
+    console.log(message, uuid, folder, mimeID, timestamp);
     uuid = "{" + uuid + "}";
     folder = 'onat@arskom.net:apps/Chat/' + folder;
-    console.log("uuid qry: " + uuid);
-    console.log("uuid qry type: " + typeof(uuid));
-    console.log(folder);
+    const date = new Date(timestamp*1000);
 
     const db_main = await openDatabase('main.db');
 
     //messages tablosuna ekleme islemi
-    db_main.run("INSERT INTO messages (uuid, local_state, read, mime_id) VALUES (?,?, ?, ?)", [uuid, '[{}]', 0, mimeID]);
+    db_main.run("INSERT INTO messages (uuid, local_state, read, mime_id, wdate, last_update, tzoffset) VALUES (?,?,?,?,?,?,?)", [uuid, '[{}]', 0, mimeID, date.toISOString(), date.toISOString(), (date.getTimezoneOffset()*60)]);
 
     /* BURASI FOLDER HANDLING ---- BURASI FOLDER HANDLING ---- BURASI FOLDER HANDLING ---- BURASI FOLDER HANDLING ---- BURASI FOLDER HANDLING*/
     const row = await new Promise((resolve, reject) => {
@@ -55,12 +51,10 @@ async function add_message_txn (message, uuid, folder, mimeID, timestamp) {
         }
       })
     });
-    
-    console.log("folder var mi: ", row.folder_exists);
 
     if (row.folder_exists !== 1){
       const createFolder = db_main.run("INSERT INTO folders (name) VALUES (?)", [folder]);
-      console.log("if folder....... CALİSTİ");
+      console.log("NEW FOLDER CREATED");
     }
 
     const rows2 = await new Promise((resolve, reject) => {
@@ -73,7 +67,6 @@ async function add_message_txn (message, uuid, folder, mimeID, timestamp) {
         }
       }
     )});
-    console.log("mID: " + rows2.id);
 
     const folderID = await new Promise((resolve, reject) => {
       db_main.get("SELECT id From folders WHERE name = ?", [folder], (err, row) => {
@@ -85,8 +78,7 @@ async function add_message_txn (message, uuid, folder, mimeID, timestamp) {
         }
       })
     });
-    console.log("fID: " + folderID.id);
-    
+
     const insert2folders = await new Promise ((resolve, reject) => {
       db_main.run("INSERT INTO msgfolders (mid, fid) VALUES (?,?)", [rows2.id, folderID.id], (err, row) => {
         if (err) {
@@ -99,18 +91,11 @@ async function add_message_txn (message, uuid, folder, mimeID, timestamp) {
     });
     /* BURASI FOLDER HANDLING BITTI ---- BURASI FOLDER HANDLING BITTI ---- BURASI FOLDER HANDLING BITTI ---- BURASI FOLDER HANDLING BITTI */
     
-    /* TIMESTAMP TO FORMAT ---- TIMESTAMP TO FORMAT ---- TIMESTAMP TO FORMAT ---- TIMESTAMP TO FORMAT ---- TIMESTAMP TO FORMAT ---- TIMESTAMP TO FORMAT */
-    const date = new Date(timestamp*1000);
-    const insertTime = await new Promise ((resolve, reject) => {
-      db_main.run
-    })
-    /* TIMESTAMP TO FORMAT BITTI ---- TIMESTAMP TO FORMAT BITTI ---- TIMESTAMP TO FORMAT BITTI ---- TIMESTAMP TO FORMAT BITTI ---- TIMESTAMP TO FORMAT BITTI */
-
     await closeDatabase(db_main);
 
     //mbody tablosuna bilgileri ekle. DONE!!!
     const db_mbody = await openDatabase('mbody.db');
-      db_mbody.run("INSERT INTO messages (uuid, data, type, enc) VALUES (?, ?, ?, ?)", [uuid, String(message), 2, 'UTF-8']);
+    db_mbody.run("INSERT INTO messages (uuid, data, type, enc) VALUES (?, ?, ?, ?)", [uuid, String(message), 2, 'UTF-8']);
     await closeDatabase(db_mbody);
 
     /*
@@ -124,14 +109,5 @@ async function add_message_txn (message, uuid, folder, mimeID, timestamp) {
   }
 }
 
-/*
-async function getUuidFromData (quotedMsg) {
-  const db_mbody = await openDatabase('mbody.db');
-  const retval = db_mbody.get("SELECT uuid FROM messages WHERE mime_id = ?", [quotedMsg._serialized]);
-  await closeDatabase(db_mbody);
-  return retval;
-}
-*/  //VAKTI GELINCE DONULECEK!
 
 module.exports = add_message_txn;
-//module.exports = getUuidFromData;

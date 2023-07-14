@@ -202,6 +202,10 @@ client.on('ready', async () => {
 });
 
 client.on('message_create', async (message) => {
+    if (message.isStatus) {
+        return;
+    }
+
     let cmdstr = message.body.split(" ")[0];
     if (command.exists(cmdstr) && whitelist.includes(message.from)) {
         return;

@@ -38,7 +38,7 @@ async function add_message_txn (message, uuid, folder, mimeID, timestamp) {
     const db_main = await openDatabase('main.db');
 
     //messages tablosuna ekleme islemi
-    db_main.run("INSERT INTO messages (uuid, local_state, read, mime_id, wdate, last_update, tzoffset) VALUES (?,?,?,?,?,?,?)", [uuid, '[{}]', 0, mimeID, date.toISOString(), date.toISOString(), (date.getTimezoneOffset()*60)]);
+    db_main.run("INSERT INTO messages (uuid, local_state, read, mime_id, wdate, last_update, tzoffset, mimesize, body_type) VALUES (?,?,?,?,?,?,?,?,?)", [uuid, '[{}]', 0, mimeID, date.toISOString(), date.toISOString(), (date.getTimezoneOffset()*60), 0]);
 
     /* BURASI FOLDER HANDLING ---- BURASI FOLDER HANDLING ---- BURASI FOLDER HANDLING ---- BURASI FOLDER HANDLING ---- BURASI FOLDER HANDLING*/
     const row = await new Promise((resolve, reject) => {
@@ -128,21 +128,43 @@ async function getMessageIRT(mimeID) {
   console.log("3");
   await closeDatabase(db_main);
   console.log("ROW: ", row);
-  return row;
+  return row.uuid;
 }
 
-async function msgIRT_txn (irtMUUID, msgUUID) {
-  
+async function msgIRT_txn (irtMUUID, mimeIRT, msgUUID) {
+
   const db_main = await openDatabase('main.db');
 
   msgUUID = '{' + msgUUID + '}';
   console.log("msgUUID:", msgUUID);
-  db_main.run("UPDATE messages SET in_reply_to = ? WHERE uuid = ?", [irtMUUID, msgUUID]);
+  db_main.run("UPDATE messages SET in_reply_to = ?, mime_irt = ? WHERE uuid = ?", [irtMUUID, mimeIRT, msgUUID]);
 
   await closeDatabase(db_main);
+}
 
+async function doesExists (mime_id){
+  const db_main = await openDatabase('main.db');
+
+  const row = await new Promise((resolve, reject) => {
+    db_main.get("SELECT CASE WHEN EXISTS (SELECT 1 FROM messages WHERE mime_id = ?) THEN 1 ELSE 0 END AS mimeID", [mime_id], (err, row) => {
+      if (err) {
+        reject (err);
+      }
+      else {
+        resolve(row);
+      }
+    })
+  });
+
+  if (row.mimeID !== 1){
+    return null;
+  }
+  await closeDatabase(db_main); 
+
+  return row.mimeID;
 }
 
 module.exports.getMessageIRT = getMessageIRT;
 module.exports.add_message_txn = add_message_txn;
 module.exports.msgIRT_txn = msgIRT_txn;
+module.exports.doesExists = doesExists;

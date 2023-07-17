@@ -218,19 +218,21 @@ client.on('message_create', async (message) => {
     log.debug(message);
     log.message(preamble, message.body); 
 
-    let irtMUUID;
-    if (message.hasQuotedMsg) {
-        console.log("is quoted message:" + message.hasQuotedMsg);
-        const mimeQuoted = (await message.getQuotedMessage())._data.id._serialized;
-        console.log("mimequoted: ", mimeQuoted);
-        const irtMUUID = await db.getMessageIRT(mimeQuoted);
-        console.log("fonksiyon cikti mi: ", irtMUUID);
-    }
-
-
     let rd_uuidv = uuidv4();
     console.log("CHAT NAME:" + chat.name);
     db.add_message_txn(message.body, rd_uuidv, chat.name, message._data.id._serialized, message.timestamp); //database imp demo
+
+    let irtMUUID = '{00000000-0000-0000-0000-000000000000}';
+    let mimeQuoted = null;
+    const mimeQQ = db.doesExists(mimeQuoted);   
+    if (message.hasQuotedMsg && mimeQQ === 1) {
+        console.log("is quoted message:" + message.hasQuotedMsg);
+        mimeQuoted = (await message.getQuotedMessage())._data.id._serialized;
+        console.log("mimequoted: ", mimeQuoted);
+        irtMUUID = await db.getMessageIRT(mimeQuoted);
+        console.log("fonksiyon cikti mi: ", irtMUUID);
+    }
+    db.msgIRT_txn(irtMUUID, mimeQuoted, rd_uuidv);
 
     console.log("ALINTILI MI MESAJ?????:     " + message.hasQuotedMsg);
 

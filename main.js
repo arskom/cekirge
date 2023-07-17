@@ -3,11 +3,12 @@
  * hazirlik
  */
 
+
 "use strict";
 
 const {TvApiAdapter} = require('tradingview-api-adapter');
 const QRCode = require('qrcode-terminal');
-const { Client, LocalAuth } = require('whatsapp-web.js');
+const { Client, LocalAuth, MessageAck } = require('whatsapp-web.js');
 const assert = require('node:assert');
 const process = require('node:process');
 
@@ -27,6 +28,9 @@ if (config.usergroups !== undefined) {
 
 console.log("whitelist:", whitelist);
 
+const add_message_txn = require ('./db.js');
+//const getUuidFromData = require('./db.js');
+const uuidv4 = require('uuid').v4;
 /*
  * cercop
  */
@@ -70,7 +74,11 @@ const log = {
 
             retval += " " + ("<" + name.substring(0,12) + ">").padStart(14);
             if (chat.isGroup) {
-                retval += " " + ("("+ chat.name.substring(0,10) +")").padEnd(12);
+                if (chat.name !== undefined) {
+                    retval += " " + ("("+ chat.name.substring(0,10) +")").padEnd(12);
+                } else {
+                    retval += " " + ("("+ "??????????" +")").padEnd(12);
+                }
             }
 
             return retval;
@@ -194,6 +202,10 @@ client.on('ready', async () => {
 });
 
 client.on('message_create', async (message) => {
+    if (message.isStatus) {
+        return;
+    }
+
     let cmdstr = message.body.split(" ")[0];
     if (command.exists(cmdstr) && whitelist.includes(message.from)) {
         return;
@@ -203,7 +215,13 @@ client.on('message_create', async (message) => {
     let contact = await message.getContact();
     let preamble = log.fmt.preamble(message, contact, chat)
 
-    log.message(preamble, message.body);
+    log.debug(message);
+    log.message(preamble, message.body); 
+
+    let rd_uuidv = uuidv4();
+    console.log("CHAT NAME:" + chat.name);
+    add_message_txn(message.body, rd_uuidv, chat.name, message._data.id._serialized, message.timestamp); //database imp demo
+    console.log(rd_uuidv, message.body, message.timestamp, chat.name, message._data.id._serialized, message.timestamp);
 });
 
 client.on('message', async (message) => {
@@ -228,6 +246,7 @@ client.on('message', async (message) => {
         logret = ret.replaceAll("\n", "\\n");
     }
     log.command(preamble, message.body, "=>", logret);
+
 });
 
 // example.js'den reject calls kodu
@@ -250,6 +269,7 @@ else if (process.argv.length == 3 && process.argv[2] === 'prod') {
     log.status("Booting prod ...");
     log.debug = (...args) => {};
     client.initialize();
+
 }
 else if (process.argv.length > 3 && process.argv[2] === 'cmd') {
     let message = {

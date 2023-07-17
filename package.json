@@ -1,7 +1,9 @@
 {
   "dependencies": {
     "qrcode-terminal": "^0.12.0",
+    "sqlite3": "^5.1.6",
     "tradingview-api-adapter": "^1.2.2",
-    "whatsapp-web.js": "^1.19.5"
+    "uuid": "^9.0.0",
+    "whatsapp-web.js": "^1.21.0"
   }
 }

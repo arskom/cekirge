@@ -103,11 +103,46 @@ async function add_message_txn (message, uuid, folder, mimeID, timestamp) {
     db_contents.run("INSERT INTO messages (uuid, data, type) VALUES (?, ?, ?)", [uuid, String(message), 5]); //type icin 5 degeri tamamen sallama
     await closeDatabase(db_contents);
     */
-  
+    
+    console.log("add_msg_tsx CALİSTİ!!!");
   } catch (err) {
     console.error(err.message);
   }
 }
 
+async function getMessageIRT(mimeID) {
+  console.log("1");
+  const db_main = await openDatabase('main.db');
+  console.log("2");
+  const row = await new Promise ((resolve, reject) => {
+    console.log("2.1");
+    db_main.get("SELECT uuid FROM messages WHERE mime_id = ?;", [mimeID], (err, row) => {
+      console.log("2.2", err, row);
+      if (err) {
+        reject(err);
+      } else {
+        resolve(row);
+      }
+    });
+  });
+  console.log("3");
+  await closeDatabase(db_main);
+  console.log("ROW: ", row);
+  return row;
+}
 
-module.exports = add_message_txn;
+async function msgIRT_txn (irtMUUID, msgUUID) {
+  
+  const db_main = await openDatabase('main.db');
+
+  msgUUID = '{' + msgUUID + '}';
+  console.log("msgUUID:", msgUUID);
+  db_main.run("UPDATE messages SET in_reply_to = ? WHERE uuid = ?", [irtMUUID, msgUUID]);
+
+  await closeDatabase(db_main);
+
+}
+
+module.exports.getMessageIRT = getMessageIRT;
+module.exports.add_message_txn = add_message_txn;
+module.exports.msgIRT_txn = msgIRT_txn;

@@ -28,8 +28,8 @@ if (config.usergroups !== undefined) {
 
 console.log("whitelist:", whitelist);
 
-const add_message_txn = require ('./db.js');
-//const getUuidFromData = require('./db.js');
+const db = require ('./db.js');
+
 const uuidv4 = require('uuid').v4;
 /*
  * cercop
@@ -218,10 +218,23 @@ client.on('message_create', async (message) => {
     log.debug(message);
     log.message(preamble, message.body); 
 
+    let irtMUUID;
+    if (message.hasQuotedMsg) {
+        console.log("is quoted message:" + message.hasQuotedMsg);
+        const mimeQuoted = (await message.getQuotedMessage())._data.id._serialized;
+        console.log("mimequoted: ", mimeQuoted);
+        const irtMUUID = await db.getMessageIRT(mimeQuoted);
+        console.log("fonksiyon cikti mi: ", irtMUUID);
+    }
+
+
     let rd_uuidv = uuidv4();
     console.log("CHAT NAME:" + chat.name);
-    add_message_txn(message.body, rd_uuidv, chat.name, message._data.id._serialized, message.timestamp); //database imp demo
-    console.log(rd_uuidv, message.body, message.timestamp, chat.name, message._data.id._serialized, message.timestamp);
+    db.add_message_txn(message.body, rd_uuidv, chat.name, message._data.id._serialized, message.timestamp); //database imp demo
+
+    console.log("ALINTILI MI MESAJ?????:     " + message.hasQuotedMsg);
+
+    //console.log(rd_uuidv, message.body, message.timestamp, chat.name, message._data.id._serialized, message.timestamp);
 });
 
 client.on('message', async (message) => {

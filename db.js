@@ -27,7 +27,7 @@ function closeDatabase(db) {
   });
 }
 
-async function add_message_txn (message, uuid, folder, mimeID, timestamp) {
+async function add_message_txn (message, uuid, folder, mimeID, timestamp, sender) {
   try {
 
     console.log(message, uuid, folder, mimeID, timestamp);
@@ -38,7 +38,7 @@ async function add_message_txn (message, uuid, folder, mimeID, timestamp) {
     const db_main = await openDatabase('main.db');
 
     //messages tablosuna ekleme islemi
-    db_main.run("INSERT INTO messages (uuid, local_state, read, mime_id, wdate, last_update, tzoffset, mimesize, body_type) VALUES (?,?,?,?,?,?,?,?,?)", [uuid, '[{}]', 0, mimeID, date.toISOString(), date.toISOString(), (date.getTimezoneOffset()*60), 0]);
+    db_main.run("INSERT INTO messages (uuid, local_state, read, mime_id, wdate, last_update, tzoffset, mimesize, body_type, sender) VALUES (?,?,?,?,?,?,?,?,?,?)", [uuid, '[{}]', 0, mimeID, date.toISOString(), date.toISOString(), (date.getTimezoneOffset()*60), 0, sender]);
 
     /* BURASI FOLDER HANDLING ---- BURASI FOLDER HANDLING ---- BURASI FOLDER HANDLING ---- BURASI FOLDER HANDLING ---- BURASI FOLDER HANDLING*/
     const row = await new Promise((resolve, reject) => {
@@ -137,7 +137,7 @@ async function msgIRT_txn (irtMUUID, mimeIRT, msgUUID) {
 
   msgUUID = '{' + msgUUID + '}';
   console.log("msgUUID:", msgUUID);
-  db_main.run("UPDATE messages SET in_reply_to = ?, mime_irt = ? WHERE uuid = ?", [irtMUUID, mimeIRT, msgUUID]);
+  await db_main.run("UPDATE messages SET in_reply_to = ?, mime_irt = ? WHERE uuid = ?", [irtMUUID, mimeIRT, msgUUID]);
 
   await closeDatabase(db_main);
 }
@@ -155,8 +155,8 @@ async function doesExists (mime_id){
       }
     })
   });
-
-  if (row.mimeID !== 1){
+  console.log("row.mimeID:", row.mimeID);
+  if (row.mimeID === 0){
     return null;
   }
   await closeDatabase(db_main); 
@@ -164,7 +164,18 @@ async function doesExists (mime_id){
   return row.mimeID;
 }
 
+async function headers_txn (uuid, header) {
+  const db_main = await openDatabase('main.db');
+  
+  uuid = '{' + uuid + '}';
+  await db_main.run("UPDATE messages SET headers = ? WHERE uuid = ?", [header, uuid]);
+
+  await closeDatabase(db_main); 
+
+}
+
 module.exports.getMessageIRT = getMessageIRT;
 module.exports.add_message_txn = add_message_txn;
 module.exports.msgIRT_txn = msgIRT_txn;
 module.exports.doesExists = doesExists;
+module.exports.headers_txn = headers_txn;

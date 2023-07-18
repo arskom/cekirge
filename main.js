@@ -29,8 +29,9 @@ if (config.usergroups !== undefined) {
 console.log("whitelist:", whitelist);
 
 const db = require ('./db.js');
-
+const hd = require ('./header');
 const uuidv4 = require('uuid').v4;
+
 /*
  * cercop
  */
@@ -218,23 +219,57 @@ client.on('message_create', async (message) => {
     log.debug(message);
     log.message(preamble, message.body); 
 
+    let fromName = '';
+    let toName = '';
+    let authorName = null;
+    if(message.fromMe){
+        fromName = client.info.pushname;
+        authorName = client.info.pushname;
+        toName = (await message.getChat()).name;
+    } else {
+        fromName = (await message.getChat()).name;
+        toName = client.info.pushname;
+        authorName = (await message.getContact()).pushname;
+    }
+
+    console.log("sender: ", hd.senderJSON(message.from, fromName));
+    console.log("sender type : ", typeof(hd.senderJSON(message.from, fromName)));
+    
+    const sender = await hd.senderJSON(message.from, fromName);
+    console.log("name:  ", client.info.pushname);
     let rd_uuidv = uuidv4();
     console.log("CHAT NAME:" + chat.name);
-    db.add_message_txn(message.body, rd_uuidv, chat.name, message._data.id._serialized, message.timestamp); //database imp demo
+    db.add_message_txn(message.body, rd_uuidv, chat.name, message._data.id._serialized, message.timestamp, sender); //database imp demo
 
     let irtMUUID = '{00000000-0000-0000-0000-000000000000}';
-    let mimeQuoted = null;
-    const mimeQQ = db.doesExists(mimeQuoted);   
-    if (message.hasQuotedMsg && mimeQQ === 1) {
-        console.log("is quoted message:" + message.hasQuotedMsg);
-        mimeQuoted = (await message.getQuotedMessage())._data.id._serialized;
-        console.log("mimequoted: ", mimeQuoted);
-        irtMUUID = await db.getMessageIRT(mimeQuoted);
-        console.log("fonksiyon cikti mi: ", irtMUUID);
+    console.log("hasQuotedMsg: ", message.hasQuotedMsg);
+    if (message.hasQuotedMsg) { //database'te kayitli olan ve cevap verilen mesajlar icin
+        const mimeQuoted = (await message.getQuotedMessage())._data.id._serialized;
+        const mimeQQ = await db.doesExists(mimeQuoted);
+        if(mimeQQ === 1){
+            irtMUUID = await db.getMessageIRT(mimeQuoted);
+            db.msgIRT_txn(irtMUUID, mimeQuoted, rd_uuidv);
+        } else {
+            console.log("alinti yapilan mesaj database'e dahil degil !!!");
+        }
+    } else {
+        db.msgIRT_txn(irtMUUID, null, rd_uuidv);
     }
-    db.msgIRT_txn(irtMUUID, mimeQuoted, rd_uuidv);
 
-    console.log("ALINTILI MI MESAJ?????:     " + message.hasQuotedMsg);
+    console.log("author: ", message.author);
+    console.log("from: ", message.from);
+
+    if ((await message.getChat()).isGroup){
+        const header = hd.hd4Groups(message.from, fromName, message.to, toName, message.author, authorName, message.to);
+        console.log("header type: ", header);
+        db.headers_txn(rd_uuidv, header);
+    } else {
+        recipients = message.to;
+        const header = await hd.hd4Direct(message.from, fromName, message.to);
+        console.log("header: ", header);
+        db.headers_txn(rd_uuidv, header);
+
+    }
 
     //console.log(rd_uuidv, message.body, message.timestamp, chat.name, message._data.id._serialized, message.timestamp);
 });

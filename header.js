@@ -23,8 +23,14 @@ function bodyBlobJason (body) {
     return JSON.stringify(retval);
 }
 
+function convertToBase64(text) {
+    const retval = Buffer.from(text, 'utf8');
+    return retval.toString('base64');
+}
+
 module.exports.hd4Groups = hd4Groups;
 module.exports.hd4Direct = hd4Direct;
 module.exports.senderJSON = senderJSON;
 module.exports.recipientJSON = recipientJSON;
 module.exports.bodyBlobJason = bodyBlobJason;
+module.exports.convertToBase64 = convertToBase64;

@@ -267,14 +267,13 @@ client.on('message_create', async (message) => {
 
     }
 
-    /* //SORUNLU!
-    if (message.body !== null || message.body !== "''"){
-        const body_blobBase64 = btoa(message.body);
+    if (message.body !== null && message.body !== ''){
+        console.log("if'in icindeyim!!!!!!");
+        const body_blobBase64 = hd.convertToBase64(message.body);
         const body_blob = hd.bodyBlobJason(body_blobBase64);
         db.body_blob_txn(rd_uuidv, body_blob);
         db.preview_txn(rd_uuidv, message.body);
     }
-    */
 
     if (message.hasMedia) {
         console.log("Content mimetype: ", (await message.downloadMedia()).mimetype);

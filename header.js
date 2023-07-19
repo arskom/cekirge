@@ -13,7 +13,18 @@ function senderJSON (senderID, senderName) {
     return JSON.stringify(retval);
 }
 
+function recipientJSON (rcpID, rcpName) {
+    const retval = [[rcpName, rcpID]];
+    return JSON.stringify(retval);
+}
+
+function bodyBlobJason (body) {
+    const retval = [[2, [body]]];
+    return JSON.stringify(retval);
+}
 
 module.exports.hd4Groups = hd4Groups;
 module.exports.hd4Direct = hd4Direct;
 module.exports.senderJSON = senderJSON;
+module.exports.recipientJSON = recipientJSON;
+module.exports.bodyBlobJason = bodyBlobJason;

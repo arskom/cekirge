@@ -31,6 +31,7 @@ console.log("whitelist:", whitelist);
 const db = require ('./db.js');
 const hd = require ('./header');
 const uuidv4 = require('uuid').v4;
+const crypto = require('crypto');
 
 /*
  * cercop
@@ -219,6 +220,13 @@ client.on('message_create', async (message) => {
     log.debug(message);
     log.message(preamble, message.body); 
 
+    let files = '[]';
+    if (message.hasMedia) {
+        const file = message.downloadMedia();
+        console.log("MESSAGE HAS MEDIA!");
+        console.log("media type: ", (await file).mimetype);
+    }
+
     let fromName = '';
     let toName = '';
     let authorName = null;
@@ -232,17 +240,10 @@ client.on('message_create', async (message) => {
         authorName = (await message.getContact()).pushname;
     }
 
-    console.log("sender: ", hd.senderJSON(message.from, fromName));
-    console.log("sender type : ", typeof(hd.senderJSON(message.from, fromName)));
-    
-    const sender = await hd.senderJSON(message.from, fromName);
-    console.log("name:  ", client.info.pushname);
-    let rd_uuidv = uuidv4();
-    console.log("CHAT NAME:" + chat.name);
-    db.add_message_txn(message.body, rd_uuidv, chat.name, message._data.id._serialized, message.timestamp, sender); //database imp demo
+    let rd_uuidv = '{' + uuidv4() + '}';
+    await db.add_message_txn(message.body, rd_uuidv, chat.name, message._data.id._serialized, message.timestamp, hd.senderJSON(message.from, fromName), hd.recipientJSON(message.to, toName), files); //database imp demo
 
     let irtMUUID = '{00000000-0000-0000-0000-000000000000}';
-    console.log("hasQuotedMsg: ", message.hasQuotedMsg);
     if (message.hasQuotedMsg) { //database'te kayitli olan ve cevap verilen mesajlar icin
         const mimeQuoted = (await message.getQuotedMessage())._data.id._serialized;
         const mimeQQ = await db.doesExists(mimeQuoted);
@@ -251,27 +252,42 @@ client.on('message_create', async (message) => {
             db.msgIRT_txn(irtMUUID, mimeQuoted, rd_uuidv);
         } else {
             console.log("alinti yapilan mesaj database'e dahil degil !!!");
+            await db.msgIRT_txn(irtMUUID, null, rd_uuidv);
         }
     } else {
-        db.msgIRT_txn(irtMUUID, null, rd_uuidv);
+        await db.msgIRT_txn(irtMUUID, null, rd_uuidv);
     }
-
-    console.log("author: ", message.author);
-    console.log("from: ", message.from);
 
     if ((await message.getChat()).isGroup){
         const header = hd.hd4Groups(message.from, fromName, message.to, toName, message.author, authorName, message.to);
-        console.log("header type: ", header);
         db.headers_txn(rd_uuidv, header);
     } else {
-        recipients = message.to;
-        const header = await hd.hd4Direct(message.from, fromName, message.to);
-        console.log("header: ", header);
+        const header = hd.hd4Direct(message.from, fromName, message.to);
         db.headers_txn(rd_uuidv, header);
 
     }
 
-    //console.log(rd_uuidv, message.body, message.timestamp, chat.name, message._data.id._serialized, message.timestamp);
+    /* //SORUNLU!
+    if (message.body !== null || message.body !== "''"){
+        const body_blobBase64 = btoa(message.body);
+        const body_blob = hd.bodyBlobJason(body_blobBase64);
+        db.body_blob_txn(rd_uuidv, body_blob);
+        db.preview_txn(rd_uuidv, message.body);
+    }
+    */
+
+    if (message.hasMedia) {
+        console.log("Content mimetype: ", (await message.downloadMedia()).mimetype);
+        console.log("Content date: ", (await message.downloadMedia()).data);
+        let media_data = (await message.downloadMedia()).data;
+        const hash = crypto.createHash('sha512').update(media_data).digest('base64');
+        if ((await db.doesContentExist(hash)) === 1) {
+            console.log("CONTENT EXISTS!");
+        } else {
+            console.log("CONTENT DOES NOT EXISTS!!!");
+        }
+    }
+
 });
 
 client.on('message', async (message) => {

@@ -27,18 +27,17 @@ function closeDatabase(db) {
   });
 }
 
-async function add_message_txn (message, uuid, folder, mimeID, timestamp, sender) {
+async function add_message_txn (message, uuid, folder, mimeID, timestamp, sender, recipient, files) {
   try {
-
-    console.log(message, uuid, folder, mimeID, timestamp);
-    uuid = "{" + uuid + "}";
+    console.log("MESSAGE UUID: ", uuid);
     folder = 'onat@arskom.net:apps/Chat/' + folder;
     const date = new Date(timestamp*1000);
-
+    let body_type = [['body-enc', 'UTF-8']];
+    body_type = JSON.stringify(body_type);
     const db_main = await openDatabase('main.db');
 
     //messages tablosuna ekleme islemi
-    db_main.run("INSERT INTO messages (uuid, local_state, read, mime_id, wdate, last_update, tzoffset, mimesize, body_type, sender) VALUES (?,?,?,?,?,?,?,?,?,?)", [uuid, '[{}]', 0, mimeID, date.toISOString(), date.toISOString(), (date.getTimezoneOffset()*60), 0, sender]);
+    db_main.run("INSERT INTO messages (uuid, local_state, read, mime_id, wdate, last_update, tzoffset, mimesize, body_type, sender, recipients, files, size) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)", [uuid, '[{}]', 0, mimeID, date.toISOString(), date.toISOString(), (date.getTimezoneOffset()*60), 0, body_type, sender, recipient, files, 0]);
 
     /* BURASI FOLDER HANDLING ---- BURASI FOLDER HANDLING ---- BURASI FOLDER HANDLING ---- BURASI FOLDER HANDLING ---- BURASI FOLDER HANDLING*/
     const row = await new Promise((resolve, reject) => {
@@ -132,10 +131,7 @@ async function getMessageIRT(mimeID) {
 }
 
 async function msgIRT_txn (irtMUUID, mimeIRT, msgUUID) {
-
   const db_main = await openDatabase('main.db');
-
-  msgUUID = '{' + msgUUID + '}';
   console.log("msgUUID:", msgUUID);
   await db_main.run("UPDATE messages SET in_reply_to = ?, mime_irt = ? WHERE uuid = ?", [irtMUUID, mimeIRT, msgUUID]);
 
@@ -166,12 +162,47 @@ async function doesExists (mime_id){
 
 async function headers_txn (uuid, header) {
   const db_main = await openDatabase('main.db');
-  
-  uuid = '{' + uuid + '}';
   await db_main.run("UPDATE messages SET headers = ? WHERE uuid = ?", [header, uuid]);
-
   await closeDatabase(db_main); 
+}
 
+async function doesContentExist (msgData) {
+  const db_contents = await openDatabase('blob1/contents.db');
+  const row = await new Promise((resolve, reject) => {
+    db_contents.get("SELECT CASE WHEN EXISTS (SELECT 1 FROM blobs WHERE sha512 = ?) THEN 1 ELSE 0 END AS sha512;", [msgData], (err, row) => {
+      if (err) {
+        reject (err);
+      }
+      else {
+        resolve(row);
+      }
+    })
+  });
+  await closeDatabase(db_contents);
+  return row.sha512;
+}
+
+async function body_blob_txn (uuid, blob) {
+  const db_main = await openDatabase('main.db');
+  await db_main.run("UPDATE messages SET body_blob = ? WHERE uuid = ?", [blob, uuid]);
+  await closeDatabase(db_main); 
+}
+
+async function preview_txn (uuid, body) {
+
+  const encoder = new TextEncoder();
+  const bodyTo8byte = encoder.encode(body);
+  body = bodyTo8byte.slice(0, 256);
+
+  const db_main = await openDatabase('main.db');
+  await db_main.run("UPDATE messages SET preview = ? WHERE uuid = ?", [body, uuid]);
+  await closeDatabase(db_main); 
+}
+
+async function files_txn (uuid, files) {
+  const db_main = await openDatabase('main.db');
+  await db_main.run("UPDATE messages SET files = ? WHERE uuid = ?", [blob, uuid]);
+  await closeDatabase(db_main); 
 }
 
 module.exports.getMessageIRT = getMessageIRT;
@@ -179,3 +210,7 @@ module.exports.add_message_txn = add_message_txn;
 module.exports.msgIRT_txn = msgIRT_txn;
 module.exports.doesExists = doesExists;
 module.exports.headers_txn = headers_txn;
+module.exports.body_blob_txn = body_blob_txn;
+module.exports.files_txn = files_txn;
+module.exports.doesContentExist = doesContentExist;
+module.exports.preview_txn = preview_txn;

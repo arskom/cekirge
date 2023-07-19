@@ -29,7 +29,7 @@ if (config.usergroups !== undefined) {
 console.log("whitelist:", whitelist);
 
 const db = require ('./db.js');
-const hd = require ('./header');
+const convert = require ('./converters');
 const uuidv4 = require('uuid').v4;
 const crypto = require('crypto');
 
@@ -241,7 +241,7 @@ client.on('message_create', async (message) => {
     }
 
     let rd_uuidv = '{' + uuidv4() + '}';
-    await db.add_message_txn(message.body, rd_uuidv, chat.name, message._data.id._serialized, message.timestamp, hd.senderJSON(message.from, fromName), hd.recipientJSON(message.to, toName), files); //database imp demo
+    await db.add_message_txn(message.body, rd_uuidv, chat.name, message._data.id._serialized, message.timestamp, convert.senderJSON(message.from, fromName), convert.recipientJSON(message.to, toName), files); //database imp demo
 
     let irtMUUID = '{00000000-0000-0000-0000-000000000000}';
     if (message.hasQuotedMsg) { //database'te kayitli olan ve cevap verilen mesajlar icin
@@ -259,18 +259,18 @@ client.on('message_create', async (message) => {
     }
 
     if ((await message.getChat()).isGroup){
-        const header = hd.hd4Groups(message.from, fromName, message.to, toName, message.author, authorName, message.to);
+        const header = convert.hd4Groups(message.from, fromName, message.to, toName, message.author, authorName, message.to);
         db.headers_txn(rd_uuidv, header);
     } else {
-        const header = hd.hd4Direct(message.from, fromName, message.to);
+        const header = convert.hd4Direct(message.from, fromName, message.to);
         db.headers_txn(rd_uuidv, header);
 
     }
 
     if (message.body !== null && message.body !== ''){
         console.log("if'in icindeyim!!!!!!");
-        const body_blobBase64 = hd.convertToBase64(message.body);
-        const body_blob = hd.bodyBlobJason(body_blobBase64);
+        const body_blobBase64 = convert.convertToBase64(message.body);
+        const body_blob = convert.bodyBlobJason(body_blobBase64);
         db.body_blob_txn(rd_uuidv, body_blob);
         db.preview_txn(rd_uuidv, message.body);
     }

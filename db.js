@@ -166,7 +166,7 @@ async function headers_txn (uuid, header) {
   await closeDatabase(db_main); 
 }
 
-async function doesContentExist (msgData) {
+async function doesExistInContents (msgData) {
   const db_contents = await openDatabase('blob1/contents.db');
   const row = await new Promise((resolve, reject) => {
     db_contents.get("SELECT CASE WHEN EXISTS (SELECT 1 FROM blobs WHERE sha512 = ?) THEN 1 ELSE 0 END AS sha512;", [msgData], (err, row) => {
@@ -205,6 +205,43 @@ async function files_txn (uuid, files) {
   await closeDatabase(db_main); 
 }
 
+async function createContent_txn(uuid, data, type, csha256, partype, parsubid, blob_id, size, csize, sha512) {
+  const db_contents = await openDatabase('blob1/contents.db');
+  const row = await db_contents.run("INSERT INTO blob_data (compression, type, data, csha256) VALUES (?,?,?,?)", [0, type, data, csha256]);
+  const row2 = await new Promise((resolve, reject) => {
+    db_contents.get("SELECT * FROM blob_data WHERE data = ?;", [data], (err, row) => {
+      if (err) {
+        reject (err);
+      }
+      else {
+        resolve(row);
+      }
+    })
+  });
+  await db_contents.run("INSERT INTO blobs (partype, parid, parsubid, blob_id, size, csize, sha512, data_id) VALUES (?,?,?,?,?,?,?,?)", [partype, uuid, parsubid, blob_id, size, csize, sha512, row2.id]);
+  await closeDatabase(db_contents);
+}
+
+async function UpdateContents (uuid, hash) {
+  const db_contents = await openDatabase('blob1/contents.db');
+
+  const row = await new Promise((resolve, reject) => {
+    db_contents.get("SELECT * FROM blobs WHERE sha512 = ?;", [hash], (err, row) => {
+      if (err) {
+        reject (err);
+      }
+      else {
+        resolve(row);
+      }
+    })
+  });
+  
+  db_contents.run("INSERT INTO blobs (partype, parid, parsubid, blob_id, size, csize, sha512, data_id) VALUES (?,?,?,?,?,?,?,?)", [row.partype, uuid, row.parid, row.blob_id, row.size, row.csize, row.sha512, row.data_id]);
+
+  await closeDatabase(db_contents);
+  console.log("ROW: ", row);  
+}
+
 module.exports.getMessageIRT = getMessageIRT;
 module.exports.add_message_txn = add_message_txn;
 module.exports.msgIRT_txn = msgIRT_txn;
@@ -212,5 +249,7 @@ module.exports.doesExists = doesExists;
 module.exports.headers_txn = headers_txn;
 module.exports.body_blob_txn = body_blob_txn;
 module.exports.files_txn = files_txn;
-module.exports.doesContentExist = doesContentExist;
+module.exports.doesExistInContents = doesExistInContents;
 module.exports.preview_txn = preview_txn;
+module.exports.createContent_txn = createContent_txn;
+module.exports.UpdateContents = UpdateContents;

@@ -266,13 +266,49 @@ client.on('message_create', async (message) => {
         db.headers_txn(rd_uuidv, header);
 
     }
-
+    //If message is not empty, do fill body_blob and preview columns in database
     if (message.body !== null && message.body !== ''){
-        console.log("if'in icindeyim!!!!!!");
-        const body_blobBase64 = convert.convertToBase64(message.body);
+        const body_blobBase64 = convert.convertToBase64(message.body); //base64 conversiton by buffer due to possibbility of message containing non-ASCII characters
         const body_blob = convert.bodyBlobJason(body_blobBase64);
-        db.body_blob_txn(rd_uuidv, body_blob);
-        db.preview_txn(rd_uuidv, message.body);
+        await db.body_blob_txn(rd_uuidv, body_blob);
+        await db.preview_txn(rd_uuidv, message.body);
+
+        const hash_SHA512 = crypto.createHash('sha512').update(message.body).digest('hex');
+        console.log("SHA12: ", hash_SHA512);
+        const hash_SHA256 = crypto.createHash('sha256').update(message.body).digest('hex');
+        console.log("SHA256: ", hash_SHA256);
+        if ((await db.doesExistInContents(hash_SHA512)) === 1){ //VAR MI YOK MU?
+            //cek veriyi
+            //await db.UpdateContents(rd_uuidv, hash_SHA512);
+            //blobs'a ekle
+        } else {
+            const encoder = new TextEncoder();
+            const encodedText = encoder.encode(message.body);
+            const sizeInBytes = encodedText.byteLength;
+            console.log("SIZE IN BYTES: ", sizeInBytes);
+            const blob_id = convert.createRegex();
+            console.log("BLOB_ID: ", blob_id);
+            if (sizeInBytes > 16384) { //BUYUK MU KUCUK MU?
+                const type = 2;
+                const fileData = new Blob([message.body], { type: 'text/plain' });
+                const filePATH = await convert.insertCharacterAtIndex(blob_id) + '.0';
+                fs.writeFile(filePATH, fileData, (err) => {
+                    if (err) {
+                      console.error('Error writing to file:', err);
+                    } else {
+                      console.log('File created and data written successfully!');
+                    }
+                });
+                await db.createContent_txn(rd_uuidv, fileData, type, hash_SHA256, 3, 0, blob_id, sizeInBytes, sizeInBytes, hash_SHA512);
+            } else {
+                console.log("DATA KUCUK!!!");
+                console.log("Message Body:", message.body);
+                const blob = Buffer.from(message.body, 'utf-8');
+                console.log("Data to be inserted:", blob);
+                const type = 1;
+                await db.createContent_txn(rd_uuidv, blob, type, hash_SHA256, 3, 0, blob_id, sizeInBytes, sizeInBytes, hash_SHA512);
+            }
+        }
     }
 
     if (message.hasMedia) {
@@ -311,7 +347,6 @@ client.on('message', async (message) => {
         logret = ret.replaceAll("\n", "\\n");
     }
     log.command(preamble, message.body, "=>", logret);
-
 });
 
 // example.js'den reject calls kodu

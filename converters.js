@@ -28,9 +28,36 @@ function convertToBase64(text) {
     return retval.toString('base64');
 }
 
+function insertCharacterAtIndex(text) {
+    text = text.substring(0, 9) + '/' + text.substring(9);
+    text = text.substring(0, 6) + '/' + text.substring(6);
+    text = text.substring(0, 3) + '/' + text.substring(3);
+    console.log("PATH : " , text);
+    return text;
+}
+
+function createRegex () {
+    const patternRegex = /^[A-V0-9]{16,}$/;
+    const characters = 'ABCDEFGHIJKLMNOPQRSTUV0123456789';
+    let randomString = '';
+
+    while (!patternRegex.test(randomString)) {
+        randomString = '';
+        for (let i = 0; i < 16; i++) {
+            const randomIndex = Math.floor(Math.random() * characters.length);
+            randomString += characters.charAt(randomIndex);
+        }
+    }
+    return randomString;
+}
+
+
+
 module.exports.hd4Groups = hd4Groups;
 module.exports.hd4Direct = hd4Direct;
 module.exports.senderJSON = senderJSON;
 module.exports.recipientJSON = recipientJSON;
 module.exports.bodyBlobJason = bodyBlobJason;
 module.exports.convertToBase64 = convertToBase64;
+module.exports.insertCharacterAtIndex = insertCharacterAtIndex;
+module.exports.createRegex = createRegex;

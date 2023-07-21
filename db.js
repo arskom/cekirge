@@ -206,19 +206,29 @@ async function files_txn (uuid, files) {
 }
 
 async function createContent_txn(uuid, data, type, csha256, partype, parsubid, blob_id, size, csize, sha512) {
+  if (! isistance(data, ArrayBuffer)) {
+    data = new TextEncoder("utf-8").encode(data);
+    data = data.buffer;
+  }
+
   const db_contents = await openDatabase('blob1/contents.db');
-  const row = await db_contents.run("INSERT INTO blob_data (compression, type, data, csha256) VALUES (?,?,?,?)", [0, type, data, csha256]);
-  const row2 = await new Promise((resolve, reject) => {
-    db_contents.get("SELECT * FROM blob_data WHERE data = ?;", [data], (err, row) => {
-      if (err) {
-        reject (err);
-      }
-      else {
-        resolve(row);
-      }
-    })
-  });
-  await db_contents.run("INSERT INTO blobs (partype, parid, parsubid, blob_id, size, csize, sha512, data_id) VALUES (?,?,?,?,?,?,?,?)", [partype, uuid, parsubid, blob_id, size, csize, sha512, row2.id]);
+  const row = await new Promise((resolve, reject) => {
+    db_contents.get(
+      "INSERT INTO blob_data (compression, type, data, csha256) VALUES (?,?,?,?) RETURNING id",
+                                                       [0, type, data, csha256],
+      (err, row) => {
+        if (err) {
+          reject (err);
+        }
+        else {
+          resolve(row);
+        }
+      })
+    });
+
+  await db_contents.run(
+    "INSERT INTO blobs (partype, parid, parsubid, blob_id, size, csize, sha512, data_id) VALUES (?,?,?,?,?,?,?,?)",
+               [partype, uuid, parsubid, blob_id, size, csize, sha512, row.id]);
   await closeDatabase(db_contents);
 }
 

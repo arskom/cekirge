@@ -302,10 +302,11 @@ client.on('message_create', async (message) => {
             console.log("SIZE IN BYTES: ", sizeInBytes);
             const blob_id = convert.createRegex();
             console.log("BLOB_ID: ", blob_id);
-            if (sizeInBytes > 16384) { //BUYUK MU KUCUK MU?
+            if (sizeInBytes >= 16384) {
                 const type = 2;
                 const fileData = new Blob([message.body], { type: 'text/plain' });
                 const filePATH = await convert.insertCharacterAtIndex(blob_id) + '.0';
+
                 fs.writeFile(filePATH, fileData, (err) => {
                     if (err) {
                       console.error('Error writing to file:', err);

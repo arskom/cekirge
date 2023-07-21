@@ -314,14 +314,18 @@ client.on('message_create', async (message) => {
                       console.log('File created and data written successfully!');
                     }
                 });
-                await db.createContent_txn(rd_uuidv, fileData, type, hash_SHA256, 3, 0, blob_id, sizeInBytes, sizeInBytes, hash_SHA512);
-            } else {
+
+                await db.createContent_txn(
+                        rd_uuidv, fileData, type,
+                                hash_SHA256, 3, 0, blob_id, sizeInBytes,
+                                                      sizeInBytes, hash_SHA512);
+            }
+            else {
                 console.log("DATA KUCUK!!!");
                 console.log("Message Body:", message.body);
-                const blob = Buffer.from(message.body, 'utf-8');
-                console.log("Data to be inserted:", blob);
                 const type = 1;
-                await db.createContent_txn(rd_uuidv, blob, type, hash_SHA256, 3, 0, blob_id, sizeInBytes, sizeInBytes, hash_SHA512);
+                await db.createContent_txn(rd_uuidv, blob, type, hash_SHA256,
+                          3, 0, blob_id, sizeInBytes, sizeInBytes, hash_SHA512);
             }
         }
     }

@@ -206,11 +206,19 @@ async function files_txn (uuid, files) {
 }
 
 async function createContent_txn(uuid, data, type, csha256, partype, parsubid, blob_id, size, csize, sha512) {
-  if (! isistance(data, ArrayBuffer)) {
+  /*
+  if (!(data instanceof Buffer)) {
+    console.log("data: ", data);
     data = new TextEncoder("utf-8").encode(data);
-    data = data.buffer;
+    console.log("data: ", data);
+    data = Buffer.from(data.buffer);
   }
 
+  console.log("data: ", data);
+  console.log("data type: ", typeof(data));
+  console.log("csha256: ", csha256);
+  console.log("csha256 type: ", typeof(csha256));
+ */
   const db_contents = await openDatabase('blob1/contents.db');
   const row = await new Promise((resolve, reject) => {
     db_contents.get(

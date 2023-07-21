@@ -291,9 +291,7 @@ client.on('message_create', async (message) => {
         console.log("SHA256: ", hash_SHA256);
 
         if ((await db.doesExistInContents(hash_SHA512)) === 1){ //VAR MI YOK MU?
-            //cek veriyi
-            //await db.UpdateContents(rd_uuidv, hash_SHA512);
-            //blobs'a ekle
+            await db.UpdateContents(rd_uuidv, hash_SHA512);
         }
         else {
             const encoder = new TextEncoder();
@@ -304,7 +302,8 @@ client.on('message_create', async (message) => {
             console.log("BLOB_ID: ", blob_id);
             if (sizeInBytes >= 16384) {
                 const type = 2;
-                const fileData = new Blob([message.body], { type: 'text/plain' });
+                const data = new TextEncoder("utf-8").encode(message.body);
+                const fileData = Buffer.from(data.buffer);
                 const filePATH = await convert.insertCharacterAtIndex(blob_id) + '.0';
 
                 fs.writeFile(filePATH, fileData, (err) => {
@@ -315,16 +314,16 @@ client.on('message_create', async (message) => {
                     }
                 });
 
-                await db.createContent_txn(
-                        rd_uuidv, fileData, type,
-                                hash_SHA256, 3, 0, blob_id, sizeInBytes,
-                                                      sizeInBytes, hash_SHA512);
+                await db.createContent_txn(rd_uuidv, filePATH, type, hash_SHA256,
+                    3, 0, blob_id, sizeInBytes, sizeInBytes, hash_SHA512);
             }
             else {
                 console.log("DATA KUCUK!!!");
                 console.log("Message Body:", message.body);
                 const type = 1;
-                await db.createContent_txn(rd_uuidv, blob, type, hash_SHA256,
+                let data = new TextEncoder("utf-8").encode(message.body);
+                data = Buffer.from(data.buffer);
+                await db.createContent_txn(rd_uuidv, data, type, hash_SHA256,
                           3, 0, blob_id, sizeInBytes, sizeInBytes, hash_SHA512);
             }
         }

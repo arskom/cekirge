@@ -49,6 +49,16 @@ function createRegex () {
     return randomString;
 }
 
+function stringToHex(str) {
+    const buffer = Buffer.from(str, 'utf8');
+    let hexString = '';
+    for (let i = 0; i < buffer.length; i++) {
+      const hexValue = buffer[i].toString(16).toUpperCase().padStart(2, '0');
+      hexString += hexValue + ' ';
+    }
+    console.log(hexString, typeof(hexString));
+    return hexString.trim(); // Remove the trailing space
+}
 
 
 module.exports.hd4Groups = hd4Groups;

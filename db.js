@@ -206,11 +206,6 @@ async function files_txn (uuid, files) {
 }
 
 async function createContent_txn(uuid, data, type, csha256, partype, parsubid, blob_id, size, csize, sha512) {
-  if (! isistance(data, ArrayBuffer)) {
-    data = new TextEncoder("utf-8").encode(data);
-    data = data.buffer;
-  }
-
   const db_contents = await openDatabase('blob1/contents.db');
   const row = await new Promise((resolve, reject) => {
     db_contents.get(

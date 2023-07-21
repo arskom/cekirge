@@ -276,9 +276,10 @@ client.on('message_create', async (message) => {
         db.headers_txn(rd_uuidv, header);
 
     }
-    //If message is not empty, do fill body_blob and preview columns in database
-    if (message.body !== null && message.body !== ''){
-        const body_blobBase64 = convert.convertToBase64(message.body); //base64 conversiton by buffer due to possibbility of message containing non-ASCII characters
+
+    // If message is not empty, do fill body_blob and preview columns in database
+    if (message.body !== null && message.body !== undefined && message.body !== ''){
+        const body_blobBase64 = convert.convertToBase64(message.body); //base64 conversion by buffer due to possibbility of message containing non-ASCII characters
         const body_blob = convert.bodyBlobJason(body_blobBase64);
         await db.body_blob_txn(rd_uuidv, body_blob);
         await db.preview_txn(rd_uuidv, message.body);

@@ -284,15 +284,18 @@ client.on('message_create', async (message) => {
         await db.body_blob_txn(rd_uuidv, body_blob);
         await db.preview_txn(rd_uuidv, message.body);
 
-        const hash_SHA512 = crypto.createHash('sha512').update(message.body).digest('hex');
-        console.log("SHA12: ", hash_SHA512);
-        const hash_SHA256 = crypto.createHash('sha256').update(message.body).digest('hex');
+        const hash_SHA512 = crypto.createHash('sha512').update(message.body).digest();
+        console.log("SHA512: ", hash_SHA512);
+
+        const hash_SHA256 = crypto.createHash('sha256').update(message.body).digest();
         console.log("SHA256: ", hash_SHA256);
+
         if ((await db.doesExistInContents(hash_SHA512)) === 1){ //VAR MI YOK MU?
             //cek veriyi
             //await db.UpdateContents(rd_uuidv, hash_SHA512);
             //blobs'a ekle
-        } else {
+        }
+        else {
             const encoder = new TextEncoder();
             const encodedText = encoder.encode(message.body);
             const sizeInBytes = encodedText.byteLength;

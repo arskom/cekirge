@@ -241,7 +241,16 @@ client.on('message_create', async (message) => {
     }
 
     let rd_uuidv = '{' + uuidv4() + '}';
-    await db.add_message_txn(message.body, rd_uuidv, chat.name, message._data.id._serialized, message.timestamp, convert.senderJSON(message.from, fromName), convert.recipientJSON(message.to, toName), files); //database imp demo
+    await db.add_message_txn(
+        message.body,
+        rd_uuidv,
+        chat.name,
+        message._data.id._serialized,
+        message.timestamp,
+        convert.senderJSON(message.from, fromName),
+        convert.recipientJSON(message.to, toName),
+        files
+    );
 
     let irtMUUID = '{00000000-0000-0000-0000-000000000000}';
     if (message.hasQuotedMsg) { //database'te kayitli olan ve cevap verilen mesajlar icin
@@ -261,7 +270,8 @@ client.on('message_create', async (message) => {
     if ((await message.getChat()).isGroup){
         const header = convert.hd4Groups(message.from, fromName, message.to, toName, message.author, authorName, message.to);
         db.headers_txn(rd_uuidv, header);
-    } else {
+    }
+    else {
         const header = convert.hd4Direct(message.from, fromName, message.to);
         db.headers_txn(rd_uuidv, header);
 
@@ -312,13 +322,19 @@ client.on('message_create', async (message) => {
     }
 
     if (message.hasMedia) {
-        console.log("Content mimetype: ", (await message.downloadMedia()).mimetype);
+        console.log("Content mimetype: ",
+                                      (await message.downloadMedia()).mimetype);
         console.log("Content date: ", (await message.downloadMedia()).data);
+
         let media_data = (await message.downloadMedia()).data;
-        const hash = crypto.createHash('sha512').update(media_data).digest('base64');
+        const hash = crypto.createHash('sha512')
+            .update(media_data)
+            .digest('base64');
+
         if ((await db.doesContentExist(hash)) === 1) {
             console.log("CONTENT EXISTS!");
-        } else {
+        }
+        else {
             console.log("CONTENT DOES NOT EXISTS!!!");
         }
     }

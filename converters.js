@@ -18,8 +18,18 @@ function recipientJSON (rcpID, rcpName) {
     return JSON.stringify(retval);
 }
 
-function bodyBlobJason (body) {
-    const retval = [[2, [body]]];
+function bodyBlobJSON (blobID, size, csize, sha512) {
+    const retval = [[2, [[blobID, String(size), String(csize), String(sha512)]]]];
+    return JSON.stringify(retval);
+}
+
+function filesJSON (fileName, mimeType, blobID, size, csize, sha512, contentID) {
+    let retval;
+    if (fileName === null || fileName === undefined || fileName === "") {
+        retval = [["", mimeType, [blobID, String(size), String(csize), String(sha512)], String(contentID),""]];
+    } else {
+        retval = [[String(fileName), mimeType, [blobID, String(size), String(csize), String(sha512)], String(contentID),""]];
+    }
     return JSON.stringify(retval);
 }
 
@@ -65,7 +75,8 @@ module.exports.hd4Groups = hd4Groups;
 module.exports.hd4Direct = hd4Direct;
 module.exports.senderJSON = senderJSON;
 module.exports.recipientJSON = recipientJSON;
-module.exports.bodyBlobJason = bodyBlobJason;
+module.exports.bodyBlobJSON = bodyBlobJSON;
 module.exports.convertToBase64 = convertToBase64;
 module.exports.insertCharacterAtIndex = insertCharacterAtIndex;
 module.exports.createRegex = createRegex;
+module.exports.filesJSON = filesJSON;

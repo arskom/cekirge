@@ -220,13 +220,6 @@ client.on('message_create', async (message) => {
     log.debug(message);
     log.message(preamble, message.body); 
 
-    let files = '[]';
-    if (message.hasMedia) {
-        const file = message.downloadMedia();
-        console.log("MESSAGE HAS MEDIA!");
-        console.log("media type: ", (await file).mimetype);
-    }
-
     let fromName = '';
     let toName = '';
     let authorName = null;
@@ -241,70 +234,61 @@ client.on('message_create', async (message) => {
     }
 
     let rd_uuidv = '{' + uuidv4() + '}';
-    await db.add_message_txn(
-        message.body,
-        rd_uuidv,
-        chat.name,
-        message._data.id._serialized,
-        message.timestamp,
-        convert.senderJSON(message.from, fromName),
-        convert.recipientJSON(message.to, toName),
-        files
-    );
 
     let irtMUUID = '{00000000-0000-0000-0000-000000000000}';
+    let mimeQuoted = null;
     if (message.hasQuotedMsg) { //database'te kayitli olan ve cevap verilen mesajlar icin
-        const mimeQuoted = (await message.getQuotedMessage())._data.id._serialized;
+        mimeQuoted = (await message.getQuotedMessage())._data.id._serialized;
         const mimeQQ = await db.doesExists(mimeQuoted);
         if(mimeQQ === 1){
             irtMUUID = await db.getMessageIRT(mimeQuoted);
-            db.msgIRT_txn(irtMUUID, mimeQuoted, rd_uuidv);
-        } else {
-            console.log("alinti yapilan mesaj database'e dahil degil !!!");
-            await db.msgIRT_txn(irtMUUID, null, rd_uuidv);
         }
-    } else {
-        await db.msgIRT_txn(irtMUUID, null, rd_uuidv);
     }
 
+    let header = '[]';
     if ((await message.getChat()).isGroup){
-        const header = convert.hd4Groups(message.from, fromName, message.to, toName, message.author, authorName, message.to);
-        db.headers_txn(rd_uuidv, header);
+        header = convert.hd4Groups(message.from, fromName, message.to, toName, message.author, authorName, message.to);
+    } else {
+        header = convert.hd4Direct(message.from, fromName, message.to);
     }
-    else {
-        const header = convert.hd4Direct(message.from, fromName, message.to);
-        db.headers_txn(rd_uuidv, header);
-
-    }
-
+    
     // If message is not empty, do fill body_blob and preview columns in database
+    let bodyBlob = null;
+    let preview = null;
     if (message.body !== null && message.body !== undefined && message.body !== ''){
-        const body_blobBase64 = convert.convertToBase64(message.body); //base64 conversion by buffer due to possibbility of message containing non-ASCII characters
-        const body_blob = convert.bodyBlobJason(body_blobBase64);
-        await db.body_blob_txn(rd_uuidv, body_blob);
-        await db.preview_txn(rd_uuidv, message.body);
+        const encoder = new TextEncoder();
+        const bodyTo8byte = encoder.encode(message.body);
+        preview = bodyTo8byte.slice(0, 256);
 
         const hash_SHA512 = crypto.createHash('sha512').update(message.body).digest();
-        console.log("SHA512: ", hash_SHA512);
-
+        const mHash_SHA512 = crypto.createHash('sha512').update(message.body).digest('base64');
         const hash_SHA256 = crypto.createHash('sha256').update(message.body).digest();
-        console.log("SHA256: ", hash_SHA256);
+
+        const mBodyBlobID = convert.createRegex();
+
+        const encodedText = encoder.encode(message.body);
+        let mSize = encodedText.byteLength;
 
         if ((await db.doesExistInContents(hash_SHA512)) === 1){ //VAR MI YOK MU?
             await db.UpdateContents(rd_uuidv, hash_SHA512);
         }
         else {
-            const encoder = new TextEncoder();
-            const encodedText = encoder.encode(message.body);
-            const sizeInBytes = encodedText.byteLength;
-            console.log("SIZE IN BYTES: ", sizeInBytes);
-            const blob_id = convert.createRegex();
-            console.log("BLOB_ID: ", blob_id);
-            if (sizeInBytes >= 16384) {
+            console.log("SIZE IN BYTES: ", mSize);
+            const data = new TextEncoder("utf-8").encode(message.body);
+            const fileData = Buffer.from(data.buffer);
+            console.log("BLOB_ID: ", mBodyBlobID);
+            if (mSize >= 16384) {
                 const type = 2;
-                const data = new TextEncoder("utf-8").encode(message.body);
-                const fileData = Buffer.from(data.buffer);
-                const filePATH = await convert.insertCharacterAtIndex(blob_id) + '.0';
+                const filePATH = './home/kene/data/profiles/onat@sobamail.com/blob1/' + (await convert.insertCharacterAtIndex(mFileBlobID)) + '.0';
+
+                /*
+                fs.mkdirSync(filePATH, { recursive: true }, (err) => {
+                    if (err) {
+                      console.error('Error creating directory:', err);
+                    } else {
+                      console.log('Directory created:', directoryPath);
+                    }
+                });
 
                 fs.writeFile(filePATH, fileData, (err) => {
                     if (err) {
@@ -313,40 +297,76 @@ client.on('message_create', async (message) => {
                       console.log('File created and data written successfully!');
                     }
                 });
+                */
 
                 await db.createContent_txn(rd_uuidv, filePATH, type, hash_SHA256,
-                    3, 0, blob_id, sizeInBytes, sizeInBytes, hash_SHA512);
+                    3, 2, mBodyBlobID, mSize, mSize, hash_SHA512);
+            }
+            else {
+                const type = 1;
+                await db.createContent_txn(rd_uuidv, fileData, type, hash_SHA256,
+                          3, 2, mBodyBlobID, mSize, mSize, hash_SHA512);
+            }
+        }
+        bodyBlob = convert.bodyBlobJSON(mBodyBlobID, mSize, mSize, mHash_SHA512);
+    }
+
+    let files = '[]';
+    if (message.hasMedia) {
+        const fmimetype = (await message.downloadMedia()).mimetype;
+        const media_data = (await message.downloadMedia()).data;
+        const ffilename = (await message.downloadMedia()).fileName;
+
+        const hash_SHA512 = crypto.createHash('sha512').update(media_data).digest();
+        const fSHA512 = crypto.createHash('sha512').update(media_data).digest('base64');
+        const hash_SHA256 = crypto.createHash('sha256').update(media_data).digest();
+
+        const mFileBlobID = convert.createRegex();
+        let sizeInBytes = 0;
+        if ((await db.doesExistInContents(hash_SHA512)) === 1) {
+            console.log("CONTENT EXISTS!");
+            await db.UpdateContents(rd_uuidv, hash_SHA512);
+        } else {
+            console.log("CONTENT DOES NOT EXISTS!!!");
+            const encoder = new TextEncoder();
+            const encodedText = encoder.encode(media_data);
+            sizeInBytes = encodedText.byteLength;
+            console.log("SIZE IN BYTES: ", sizeInBytes);
+
+            console.log("BLOB_ID: ", mFileBlobID);
+            if (sizeInBytes >= 16384) {
+                const type = 2;
+                const data = new TextEncoder("utf-8").encode(media_data);
+                const fileData = Buffer.from(data.buffer);
+                const filePATH = (await convert.insertCharacterAtIndex(mFileBlobID)) + '.0';
+                const directory = './home/kene/data/profiles/onat@sobamail.com/blob1/';
+
+                /*
+                await fs.mkdirSync(directory + filePATH);
+                await fs.writeFileSync(path.join(directory, filePATH), fileData);
+                */
+
+                await db.createContent_txn(rd_uuidv, filePATH, type, hash_SHA256,
+                    2, 3, mFileBlobID, sizeInBytes, sizeInBytes, hash_SHA512);
             }
             else {
                 console.log("DATA KUCUK!!!");
-                console.log("Message Body:", message.body);
                 const type = 1;
-                let data = new TextEncoder("utf-8").encode(message.body);
+                let data = new TextEncoder("utf-8").encode(media_data);
                 data = Buffer.from(data.buffer);
                 await db.createContent_txn(rd_uuidv, data, type, hash_SHA256,
-                          3, 0, blob_id, sizeInBytes, sizeInBytes, hash_SHA512);
+                          2, 3, mFileBlobID, sizeInBytes, sizeInBytes, hash_SHA512);
             }
         }
+        const contentID = await db.getContentID(hash_SHA512);
+        console.log("contentID: ", contentID);
+        files = convert.filesJSON(ffilename, fmimetype, mFileBlobID, sizeInBytes, sizeInBytes, fSHA512, contentID);
     }
 
-    if (message.hasMedia) {
-        console.log("Content mimetype: ",
-                                      (await message.downloadMedia()).mimetype);
-        console.log("Content date: ", (await message.downloadMedia()).data);
 
-        let media_data = (await message.downloadMedia()).data;
-        const hash = crypto.createHash('sha512')
-            .update(media_data)
-            .digest('base64');
-
-        if ((await db.doesContentExist(hash)) === 1) {
-            console.log("CONTENT EXISTS!");
-        }
-        else {
-            console.log("CONTENT DOES NOT EXISTS!!!");
-        }
-    }
-
+    await db.add_message_txn(message.body, rd_uuidv, chat.name, message._data.id._serialized, 
+        message.timestamp, convert.senderJSON(message.from, fromName), 
+                    convert.recipientJSON(message.to, toName), files, irtMUUID, mimeQuoted, header, preview, bodyBlob); //database imp demo
 });
 
 client.on('message', async (message) => {

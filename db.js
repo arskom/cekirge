@@ -27,7 +27,7 @@ function closeDatabase(db) {
   });
 }
 
-async function add_message_txn (message, uuid, folder, mimeID, timestamp, sender, recipient, files) {
+async function add_message_txn (message, uuid, folder, mimeID, timestamp, sender, recipient, files, irtMUUID, mimeQuoted, header, preview, bodyBlob) {
   try {
     console.log("MESSAGE UUID: ", uuid);
     folder = 'onat@arskom.net:apps/Chat/' + folder;
@@ -37,7 +37,7 @@ async function add_message_txn (message, uuid, folder, mimeID, timestamp, sender
     const db_main = await openDatabase('main.db');
 
     //messages tablosuna ekleme islemi
-    db_main.run("INSERT INTO messages (uuid, local_state, read, mime_id, wdate, last_update, tzoffset, mimesize, body_type, sender, recipients, files, size) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)", [uuid, '[{}]', 0, mimeID, date.toISOString(), date.toISOString(), (date.getTimezoneOffset()*60), 0, body_type, sender, recipient, files, 0]);
+    db_main.run("INSERT INTO messages (uuid, local_state, read, mime_id, wdate, last_update, tzoffset, mimesize, body_type, sender, recipients, files, size, in_reply_to, mime_irt, headers, preview, body_blob) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", [uuid, '[{}]', 0, mimeID, date.toISOString(), date.toISOString(), (date.getTimezoneOffset()*60), 0, body_type, sender, recipient, files, 0, irtMUUID, mimeQuoted, header, preview, bodyBlob]);
 
     /* BURASI FOLDER HANDLING ---- BURASI FOLDER HANDLING ---- BURASI FOLDER HANDLING ---- BURASI FOLDER HANDLING ---- BURASI FOLDER HANDLING*/
     const row = await new Promise((resolve, reject) => {
@@ -160,12 +160,6 @@ async function doesExists (mime_id){
   return row.mimeID;
 }
 
-async function headers_txn (uuid, header) {
-  const db_main = await openDatabase('main.db');
-  await db_main.run("UPDATE messages SET headers = ? WHERE uuid = ?", [header, uuid]);
-  await closeDatabase(db_main); 
-}
-
 async function doesExistInContents (msgData) {
   const db_contents = await openDatabase('blob1/contents.db');
   const row = await new Promise((resolve, reject) => {
@@ -206,19 +200,6 @@ async function files_txn (uuid, files) {
 }
 
 async function createContent_txn(uuid, data, type, csha256, partype, parsubid, blob_id, size, csize, sha512) {
-  /*
-  if (!(data instanceof Buffer)) {
-    console.log("data: ", data);
-    data = new TextEncoder("utf-8").encode(data);
-    console.log("data: ", data);
-    data = Buffer.from(data.buffer);
-  }
-
-  console.log("data: ", data);
-  console.log("data type: ", typeof(data));
-  console.log("csha256: ", csha256);
-  console.log("csha256 type: ", typeof(csha256));
- */
   const db_contents = await openDatabase('blob1/contents.db');
   const row = await new Promise((resolve, reject) => {
     db_contents.get(
@@ -260,14 +241,32 @@ async function UpdateContents (uuid, hash) {
   console.log("ROW: ", row);  
 }
 
+async function getContentID (sha512) {
+  const db_contents = await openDatabase('blob1/contents.db');
+  const row = await new Promise((resolve, reject) => {
+    db_contents.get("SELECT data_id FROM blobs  WHERE sha512 = ?", [sha512], (err, row) => {
+      if (err) {
+        reject (err);
+      }
+      else {
+        resolve(row);
+      }
+    })
+  });
+  await closeDatabase(db_contents);
+  return row.data_id;
+}
+
+
 module.exports.getMessageIRT = getMessageIRT;
 module.exports.add_message_txn = add_message_txn;
 module.exports.msgIRT_txn = msgIRT_txn;
 module.exports.doesExists = doesExists;
-module.exports.headers_txn = headers_txn;
+//module.exports.headers_txn = headers_txn;
 module.exports.body_blob_txn = body_blob_txn;
 module.exports.files_txn = files_txn;
 module.exports.doesExistInContents = doesExistInContents;
 module.exports.preview_txn = preview_txn;
 module.exports.createContent_txn = createContent_txn;
 module.exports.UpdateContents = UpdateContents;
+module.exports.getContentID = getContentID;

@@ -279,16 +279,8 @@ client.on('message_create', async (message) => {
             console.log("BLOB_ID: ", mBodyBlobID);
             if (mSize >= 16384) {
                 const type = 2;
-                const filePATH = './home/kene/data/profiles/onat@sobamail.com/blob1/' + (await convert.insertCharacterAtIndex(mFileBlobID)) + '.0';
-
-                /*
-                fs.mkdirSync(filePATH, { recursive: true }, (err) => {
-                    if (err) {
-                      console.error('Error creating directory:', err);
-                    } else {
-                      console.log('Directory created:', directoryPath);
-                    }
-                });
+                const fileData = new Blob([message.body], { type: 'text/plain' });
+                const filePATH = await convert.insertCharacterAtIndex(blob_id) + '.0';
 
                 fs.writeFile(filePATH, fileData, (err) => {
                     if (err) {
@@ -299,13 +291,15 @@ client.on('message_create', async (message) => {
                 });
                 */
 
-                await db.createContent_txn(rd_uuidv, filePATH, type, hash_SHA256,
-                    3, 2, mBodyBlobID, mSize, mSize, hash_SHA512);
+                await db.createContent_txn(
+                        rd_uuidv, fileData, type,
+                                hash_SHA256, 3, 0, blob_id, sizeInBytes,
+                                                      sizeInBytes, hash_SHA512);
             }
             else {
                 const type = 1;
-                await db.createContent_txn(rd_uuidv, fileData, type, hash_SHA256,
-                          3, 2, mBodyBlobID, mSize, mSize, hash_SHA512);
+                await db.createContent_txn(rd_uuidv, blob, type, hash_SHA256,
+                          3, 0, blob_id, sizeInBytes, sizeInBytes, hash_SHA512);
             }
         }
         bodyBlob = convert.bodyBlobJSON(mBodyBlobID, mSize, mSize, mHash_SHA512);

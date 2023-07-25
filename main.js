@@ -222,15 +222,15 @@ client.on('message_create', async (message) => {
 
     let fromName = '';
     let toName = '';
-    let authorName = null;
+    let listID = '';
     if(message.fromMe){
         fromName = client.info.pushname;
-        authorName = client.info.pushname;
         toName = (await message.getChat()).name;
+        listID = (await message.getChat()).name;
     } else {
         fromName = (await message.getChat()).name;
+        listID = (await message.getChat()).name;
         toName = client.info.pushname;
-        authorName = (await message.getContact()).pushname;
     }
 
     let rd_uuidv = '{' + uuidv4() + '}';
@@ -248,7 +248,7 @@ client.on('message_create', async (message) => {
     let header = '[]';
     let folder = 'onat@arskom.net:apps/Chat';
     if ((await message.getChat()).isGroup){
-        header = convert.hd4Groups(message.from, fromName, message.to, toName, message.to);
+        header = convert.hd4Groups(message.from, fromName, message.to, toName, listID);
         folder = 'onat@arskom.net:apps/Chat/' +  chat.name;
     } else {
         header = convert.hd4Direct(message.from, fromName, message.to);
@@ -290,11 +290,12 @@ client.on('message_create', async (message) => {
                 filePATH = filePATH.slice(0,12);
                 const finalPath = path.join(filePATH, fileName);
                 const directory = '/home/kene/data/profiles/onat@sobamail.com/blob1/';
+                const dbPATH = directory + filePATH;
 
                 fs.mkdirSync(directory + filePATH, { recursive: true });
                 fs.writeFileSync(directory + finalPath, message.body);
 
-                await db.createContent_txn(rd_uuidv, filePATH, type, hash_SHA256,
+                await db.createContent_txn(rd_uuidv, dbPATH, type, hash_SHA256,
                     3, 2, mBodyBlobID, mSize, mSize, hash_SHA512);
                 bodyBlob = convert.bodyBlobJSON(mBodyBlobID, mSize, mSize, mHash_SHA512);
             }
@@ -341,11 +342,12 @@ client.on('message_create', async (message) => {
                 filePATH = filePATH.slice(0,12);
                 const finalPath = path.join(filePATH, fileName);
                 const directory = '/home/kene/data/profiles/onat@sobamail.com/blob1/';
+                const dbPATH = directory + filePATH;
 
                 fs.mkdirSync(directory + filePATH, { recursive: true });
                 fs.writeFileSync(directory + finalPath, fileData);
 
-                await db.createContent_txn(rd_uuidv, filePATH, type, hash_SHA256,
+                await db.createContent_txn(rd_uuidv, dbPATH, type, hash_SHA256,
                     2, 3, mFileBlobID, sizeInBytes, sizeInBytes, hash_SHA512);
             
                 const contentID = await db.getContentID(hash_SHA512);

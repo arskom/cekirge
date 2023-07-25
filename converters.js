@@ -30,8 +30,10 @@ function bodyBlobB64JSON (bodyBase64) {
 
 function filesJSON (fileName, mimeType, blobID, size, csize, sha512, contentID) {
     let retval;
+    const ext =  '.' + fileType(mimeType);
+    console.log("extension: ", ext);
     if (fileName === null || fileName === undefined || fileName === "") {
-        retval = [["", mimeType, [blobID, String(size), String(csize), String(sha512)], String(contentID),""]];
+        retval = [["Unnamed Attachment"+ext, mimeType, [blobID, String(size), String(csize), String(sha512)], String(contentID),""]];
     } else {
         retval = [[String(fileName), mimeType, [blobID, String(size), String(csize), String(sha512)], String(contentID),""]];
     }
@@ -40,8 +42,10 @@ function filesJSON (fileName, mimeType, blobID, size, csize, sha512, contentID) 
 
 function filesB64JSON (fileName, mimeType, data) {
     let retval;
+    const ext =  '.' + fileType(mimeType);
+    console.log("extension: ", ext);
     if (fileName === null || fileName === undefined || fileName === "") {
-        retval = [["Unnamed Attachment", String(mimeType), [String(data)], "", ""]];
+        retval = [["Unnamed Attachment" + ext, String(mimeType), [String(data)], "", ""]];
     }
     else {
         retval = [[String(fileName), String(mimeType), [String(data)], "", ""]];
@@ -71,8 +75,22 @@ function createRegex () {
         const randomIndex = Math.floor(Math.random() * characters.length);
         randomString += characters.charAt(randomIndex);
     }
-
     return randomString;
+}
+
+function fileType (str) {
+    let retval;
+    if (str === 'text/plain') {
+        retval = 'txt'
+        return retval;
+    }
+
+    if (str.includes(';')) {
+        retval = str.slice(str.indexOf('/')+1, str.indexOf(';'));
+    } else {
+        retval = str.slice(str.indexOf('/')+1);
+    }
+    return retval;
 }
 
 module.exports.hd4Groups = hd4Groups;

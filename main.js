@@ -246,8 +246,10 @@ client.on('message_create', async (message) => {
     }
 
     let header = '[]';
+    let folder = 'onat@arskom.net:apps/Chat';
     if ((await message.getChat()).isGroup){
-        header = convert.hd4Groups(message.from, fromName, message.to, toName, message.author, authorName, message.to);
+        header = convert.hd4Groups(message.from, fromName, message.to, toName, message.to);
+        folder = 'onat@arskom.net:apps/Chat/' +  chat.name;
     } else {
         header = convert.hd4Direct(message.from, fromName, message.to);
     }
@@ -362,12 +364,6 @@ client.on('message_create', async (message) => {
             }
         }
     }
-
-    let folder = 'onat@arskom.net:apps/Chat';
-    if ((await message.getChat()).isGroup) {
-        folder = 'onat@arskom.net:apps/Chat/' +  chat.name;
-    }
-
 
     await db.add_message_txn(message.body, rd_uuidv, folder, message._data.id._serialized, 
         message.timestamp, convert.senderJSON(message.from, fromName), 

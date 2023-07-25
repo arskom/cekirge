@@ -1,5 +1,5 @@
-function hd4Groups (from, fromName, to, toName, author, authorName, listID) {
-    const hd = [["From", [fromName, from]],["To", [toName, to]],["Author", [authorName, author]],["List-ID", [listID]]];
+function hd4Groups (from, fromName, to, toName, listID) {
+    const hd = [["From", [fromName, from]],["To", [toName, to]],["List-ID", [listID]]];
     return JSON.stringify(hd);
 }
 

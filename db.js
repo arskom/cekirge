@@ -30,7 +30,6 @@ function closeDatabase(db) {
 async function add_message_txn (message, uuid, folder, mimeID, timestamp, sender, recipient, files, irtMUUID, mimeQuoted, header, preview, bodyBlob) {
   try {
     console.log("MESSAGE UUID: ", uuid);
-    folder = 'onat@arskom.net:apps/Chat/' + folder;
     const date = new Date(timestamp*1000);
     let body_type = [['body-enc', 'UTF-8']];
     body_type = JSON.stringify(body_type);
@@ -89,7 +88,7 @@ async function add_message_txn (message, uuid, folder, mimeID, timestamp, sender
       })
     });
     /* BURASI FOLDER HANDLING BITTI ---- BURASI FOLDER HANDLING BITTI ---- BURASI FOLDER HANDLING BITTI ---- BURASI FOLDER HANDLING BITTI */
-    
+
     await closeDatabase(db_main);
 
     //mbody tablosuna bilgileri ekle. DONE!!!

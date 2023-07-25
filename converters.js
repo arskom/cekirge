@@ -23,12 +23,28 @@ function bodyBlobJSON (blobID, size, csize, sha512) {
     return JSON.stringify(retval);
 }
 
+function bodyBlobB64JSON (bodyBase64) {
+    const retval = [[2, [String(bodyBase64)]],];
+    return JSON.stringify(retval);
+}
+
 function filesJSON (fileName, mimeType, blobID, size, csize, sha512, contentID) {
     let retval;
     if (fileName === null || fileName === undefined || fileName === "") {
         retval = [["", mimeType, [blobID, String(size), String(csize), String(sha512)], String(contentID),""]];
     } else {
         retval = [[String(fileName), mimeType, [blobID, String(size), String(csize), String(sha512)], String(contentID),""]];
+    }
+    return JSON.stringify(retval);
+}
+
+function filesB64JSON (fileName, mimeType, data) {
+    let retval;
+    if (fileName === null || fileName === undefined || fileName === "") {
+        retval = [["Unnamed Attachment", String(mimeType), [String(data)], "", ""]];
+    }
+    else {
+        retval = [[String(fileName), String(mimeType), [String(data)], "", ""]];
     }
     return JSON.stringify(retval);
 }
@@ -59,18 +75,6 @@ function createRegex () {
     return randomString;
 }
 
-function stringToHex(str) {
-    const buffer = Buffer.from(str, 'utf8');
-    let hexString = '';
-    for (let i = 0; i < buffer.length; i++) {
-      const hexValue = buffer[i].toString(16).toUpperCase().padStart(2, '0');
-      hexString += hexValue + ' ';
-    }
-    console.log(hexString, typeof(hexString));
-    return hexString.trim(); // Remove the trailing space
-}
-
-
 module.exports.hd4Groups = hd4Groups;
 module.exports.hd4Direct = hd4Direct;
 module.exports.senderJSON = senderJSON;
@@ -80,3 +84,5 @@ module.exports.convertToBase64 = convertToBase64;
 module.exports.insertCharacterAtIndex = insertCharacterAtIndex;
 module.exports.createRegex = createRegex;
 module.exports.filesJSON = filesJSON;
+module.exports.filesB64JSON = filesB64JSON;
+module.exports.bodyBlobB64JSON = bodyBlobB64JSON;

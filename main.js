@@ -277,32 +277,32 @@ client.on('message_create', async (message) => {
             const data = new TextEncoder("utf-8").encode(message.body);
             const fileData = Buffer.from(data.buffer);
             console.log("BLOB_ID: ", mBodyBlobID);
-            if (mSize >= 16384) {
+            if (mSize <= 512) {
+                const base64 = btoa(String.fromCharCode(...data));
+                bodyBlob = convert.bodyBlobB64JSON(base64);
+            }
+            else if (mSize >= 16384) {
                 const type = 2;
-                const fileData = new Blob([message.body], { type: 'text/plain' });
-                const filePATH = await convert.insertCharacterAtIndex(blob_id) + '.0';
+                let filePATH = (await convert.insertCharacterAtIndex(mBodyBlobID)) + '.0';
+                const fileName = filePATH.slice(12);
+                filePATH = filePATH.slice(0,12);
+                const finalPath = path.join(filePATH, fileName);
+                const directory = '/home/kene/data/profiles/onat@sobamail.com/blob1/';
 
-                fs.writeFile(filePATH, fileData, (err) => {
-                    if (err) {
-                      console.error('Error writing to file:', err);
-                    } else {
-                      console.log('File created and data written successfully!');
-                    }
-                });
-                */
+                fs.mkdirSync(directory + filePATH, { recursive: true });
+                fs.writeFileSync(directory + finalPath, message.body);
 
-                await db.createContent_txn(
-                        rd_uuidv, fileData, type,
-                                hash_SHA256, 3, 0, blob_id, sizeInBytes,
-                                                      sizeInBytes, hash_SHA512);
+                await db.createContent_txn(rd_uuidv, filePATH, type, hash_SHA256,
+                    3, 2, mBodyBlobID, mSize, mSize, hash_SHA512);
+                bodyBlob = convert.bodyBlobJSON(mBodyBlobID, mSize, mSize, mHash_SHA512);
             }
             else {
                 const type = 1;
-                await db.createContent_txn(rd_uuidv, blob, type, hash_SHA256,
-                          3, 0, blob_id, sizeInBytes, sizeInBytes, hash_SHA512);
+                await db.createContent_txn(rd_uuidv, fileData, type, hash_SHA256,
+                          3, 2, mBodyBlobID, mSize, mSize, hash_SHA512);
+                bodyBlob = convert.bodyBlobJSON(mBodyBlobID, mSize, mSize, mHash_SHA512);
             }
         }
-        bodyBlob = convert.bodyBlobJSON(mBodyBlobID, mSize, mSize, mHash_SHA512);
     }
 
     let files = '[]';
@@ -328,20 +328,26 @@ client.on('message_create', async (message) => {
             console.log("SIZE IN BYTES: ", sizeInBytes);
 
             console.log("BLOB_ID: ", mFileBlobID);
-            if (sizeInBytes >= 16384) {
+            if (sizeInBytes <= 512) {
+                files = convert.filesB64JSON(ffilename, fmimetype, media_data);
+            }
+            else if (sizeInBytes >= 16384) {
                 const type = 2;
-                const data = new TextEncoder("utf-8").encode(media_data);
-                const fileData = Buffer.from(data.buffer);
-                const filePATH = (await convert.insertCharacterAtIndex(mFileBlobID)) + '.0';
-                const directory = './home/kene/data/profiles/onat@sobamail.com/blob1/';
+                const fileData = Buffer.from(media_data, 'base64');
+                let filePATH = (await convert.insertCharacterAtIndex(mFileBlobID)) + '.0';
+                const fileName = filePATH.slice(12);
+                filePATH = filePATH.slice(0,12);
+                const finalPath = path.join(filePATH, fileName);
+                const directory = '/home/kene/data/profiles/onat@sobamail.com/blob1/';
 
-                /*
-                await fs.mkdirSync(directory + filePATH);
-                await fs.writeFileSync(path.join(directory, filePATH), fileData);
-                */
+                fs.mkdirSync(directory + filePATH, { recursive: true });
+                fs.writeFileSync(directory + finalPath, fileData);
 
                 await db.createContent_txn(rd_uuidv, filePATH, type, hash_SHA256,
                     2, 3, mFileBlobID, sizeInBytes, sizeInBytes, hash_SHA512);
+            
+                const contentID = await db.getContentID(hash_SHA512);
+                files = convert.filesJSON(ffilename, fmimetype, mFileBlobID, sizeInBytes, sizeInBytes, fSHA512, contentID);
             }
             else {
                 console.log("DATA KUCUK!!!");
@@ -350,15 +356,20 @@ client.on('message_create', async (message) => {
                 data = Buffer.from(data.buffer);
                 await db.createContent_txn(rd_uuidv, data, type, hash_SHA256,
                           2, 3, mFileBlobID, sizeInBytes, sizeInBytes, hash_SHA512);
+
+                const contentID = await db.getContentID(hash_SHA512);
+                files = convert.filesJSON(ffilename, fmimetype, mFileBlobID, sizeInBytes, sizeInBytes, fSHA512, contentID);
             }
         }
-        const contentID = await db.getContentID(hash_SHA512);
-        console.log("contentID: ", contentID);
-        files = convert.filesJSON(ffilename, fmimetype, mFileBlobID, sizeInBytes, sizeInBytes, fSHA512, contentID);
+    }
+
+    let folder = 'onat@arskom.net:apps/Chat';
+    if ((await message.getChat()).isGroup) {
+        folder = 'onat@arskom.net:apps/Chat/' +  chat.name;
     }
 
 
-    await db.add_message_txn(message.body, rd_uuidv, chat.name, message._data.id._serialized, 
+    await db.add_message_txn(message.body, rd_uuidv, folder, message._data.id._serialized, 
         message.timestamp, convert.senderJSON(message.from, fromName), 
                     convert.recipientJSON(message.to, toName), files, irtMUUID, mimeQuoted, header, preview, bodyBlob); //database imp demo
 });

@@ -246,10 +246,9 @@ client.on('message_create', async (message) => {
     }
 
     let header = '[]';
-    let folder = 'onat@arskom.net:apps/Chat';
+    let ChatID = (await message.getChat()).id;
     if ((await message.getChat()).isGroup){
         header = convert.hd4Groups(message.from, fromName, message.to, toName, listID);
-        folder = 'onat@arskom.net:apps/Chat/' +  chat.name;
     } else {
         header = convert.hd4Direct(message.from, fromName, message.to);
     }
@@ -270,6 +269,7 @@ client.on('message_create', async (message) => {
 
         const encodedText = encoder.encode(message.body);
         let mSize = encodedText.byteLength;
+        console.log("MBODY SIZE: ", mSize);
 
         if ((await db.doesExistInContents(hash_SHA512)) === 1){ //VAR MI YOK MU?
             await db.UpdateContents(rd_uuidv, hash_SHA512);
@@ -309,10 +309,11 @@ client.on('message_create', async (message) => {
     }
 
     let files = '[]';
-    if (message.hasMedia) {
+    if (message.hasMedia && message.downloadMedia() !== undefined ) {
         const fmimetype = (await message.downloadMedia()).mimetype;
         const media_data = (await message.downloadMedia()).data;
         const ffilename = (await message.downloadMedia()).fileName;
+        console.log("ffilename: ", ffilename);
 
         const hash_SHA512 = crypto.createHash('sha512').update(media_data).digest();
         const fSHA512 = crypto.createHash('sha512').update(media_data).digest('base64');
@@ -342,7 +343,8 @@ client.on('message_create', async (message) => {
                 filePATH = filePATH.slice(0,12);
                 const finalPath = path.join(filePATH, fileName);
                 const directory = '/home/kene/data/profiles/onat@sobamail.com/blob1/';
-                const dbPATH = directory + filePATH;
+                const dbPATH = 'blob1/' + finalPath;
+                console.log("dbPATH: ", dbPATH);
 
                 fs.mkdirSync(directory + filePATH, { recursive: true });
                 fs.writeFileSync(directory + finalPath, fileData);
@@ -367,7 +369,7 @@ client.on('message_create', async (message) => {
         }
     }
 
-    await db.add_message_txn(message.body, rd_uuidv, folder, message._data.id._serialized, 
+    await db.add_message_txn(message.body, (await message.getChat()).isGroup, ChatID, rd_uuidv, chat.name, message._data.id._serialized, 
         message.timestamp, convert.senderJSON(message.from, fromName), 
                     convert.recipientJSON(message.to, toName), files, irtMUUID, mimeQuoted, header, preview, bodyBlob); //database imp demo
 });

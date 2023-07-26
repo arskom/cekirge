@@ -27,34 +27,18 @@ function closeDatabase(db) {
   });
 }
 
-async function add_message_txn (message, uuid, folder, mimeID, timestamp, sender, recipient, files, irtMUUID, mimeQuoted, header, preview, bodyBlob) {
+async function add_message_txn (message, isGroup, ChatID, uuid, ChatName, mimeID, timestamp, sender, recipient, files, irtMUUID, mimeQuoted, header, preview, bodyBlob) {
   try {
     console.log("MESSAGE UUID: ", uuid);
     const date = new Date(timestamp*1000);
     let body_type = [['body-enc', 'UTF-8']];
     body_type = JSON.stringify(body_type);
     const db_main = await openDatabase('main.db');
-
+    const folder = 'onat@arskom.net:apps/Chat/' + ChatName;
     //messages tablosuna ekleme islemi
-    db_main.run("INSERT INTO messages (uuid, local_state, read, mime_id, wdate, last_update, tzoffset, mimesize, body_type, sender, recipients, files, size, in_reply_to, mime_irt, headers, preview, body_blob) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", [uuid, '[{}]', 0, mimeID, date.toISOString(), date.toISOString(), (date.getTimezoneOffset()*60), 0, body_type, sender, recipient, files, 0, irtMUUID, mimeQuoted, header, preview, bodyBlob]);
+    await db_main.run("INSERT INTO messages (uuid, local_state, read, mime_id, wdate, last_update, tzoffset, mimesize, body_type, sender, recipients, files, size, in_reply_to, mime_irt, headers, preview, body_blob) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", [uuid, '[{}]', 0, mimeID, date.toISOString(), date.toISOString(), (date.getTimezoneOffset()*60), 0, body_type, sender, recipient, files, 0, irtMUUID, mimeQuoted, header, preview, bodyBlob]);
 
-    /* BURASI FOLDER HANDLING ---- BURASI FOLDER HANDLING ---- BURASI FOLDER HANDLING ---- BURASI FOLDER HANDLING ---- BURASI FOLDER HANDLING*/
-    const row = await new Promise((resolve, reject) => {
-      db_main.get("SELECT CASE WHEN EXISTS (SELECT 1 FROM folders WHERE name = ?) THEN 1 ELSE 0 END AS folder_exists;", [folder], (err, row) => {
-        if (err) {
-          reject (err);
-        }
-        else {
-          resolve(row);
-        }
-      })
-    });
-
-    if (row.folder_exists !== 1){
-      const createFolder = db_main.run("INSERT INTO folders (name) VALUES (?)", [folder]);
-      console.log("NEW FOLDER CREATED");
-    }
-
+    //Get the id of the message that have been inserted.
     const rows2 = await new Promise((resolve, reject) => {
       db_main.get("SELECT id FROM messages WHERE uuid = ?;", [uuid], (err, row) => {
         if (err) {
@@ -66,42 +50,60 @@ async function add_message_txn (message, uuid, folder, mimeID, timestamp, sender
       }
     )});
 
-    const folderID = await new Promise((resolve, reject) => {
-      db_main.get("SELECT id From folders WHERE name = ?", [folder], (err, row) => {
-        if (err) {
-          reject (err);
-        }
-        else {
-          resolve (row);
-        }
-      })
-    });
-
-    const insert2folders = await new Promise ((resolve, reject) => {
-      db_main.run("INSERT INTO msgfolders (mid, fid) VALUES (?,?)", [rows2.id, folderID.id], (err, row) => {
-        if (err) {
-          reject (err);
-        }
-        else {
-          resolve (row);
-        }
-      })
-    });
-    /* BURASI FOLDER HANDLING BITTI ---- BURASI FOLDER HANDLING BITTI ---- BURASI FOLDER HANDLING BITTI ---- BURASI FOLDER HANDLING BITTI */
+    /* TODO:  In case of two different whatsapp groups with different val values but same key values in folderattrs table,
+              There should be a difference in the name values in folders table.
+    */
+    if (isGroup) {
+      const row = await new Promise((resolve, reject) => {
+        db_main.get("SELECT CASE WHEN EXISTS (SELECT 1 FROM folderattrs WHERE value = ?) THEN 1 ELSE 0 END AS folder_exists;", [ChatID], (err, row) => {
+          if (err) {
+            reject (err);
+          }
+          else {
+            resolve(row);
+          }
+        })
+      });
+      if (row.folder_exists === 1){
+        const rowValue = await new Promise((resolve, reject) => {
+          db_main.get("SELECT fid FROM folderarttrs WHERE value = ?", [ChatID], (err, row) => {
+            if (err) {
+              reject (err);
+            }
+            else {
+              resolve(row);
+            }
+          })
+        });
+        db_main.run("INSERT INTO msgfolders (mid, fid) VALUES (?,?)", [rows2.id, rowValue.fid]);
+      } else {
+        await db_main.run("INSERT INTO folders (name) VALUES (?)", [folder]);
+        const row = await new Promise((resolve, reject) => {
+          db_main.get("SELECT id FROM folders WHERE name = ?", [folder], (err, row) => {
+            if (err) {
+              reject (err);
+            }
+            else {
+              resolve(row);
+            }
+          })
+        });
+        await db_main.run("INSERT INTO folderattrs (fid,key,val) VALUES (?,?,?)", [row.id, ChatName, ChatID]);
+        await db_main.run("INSERT INTO msgfolders (mid, fid) VALUES (?,?)", [rows2.id, row.id]);
+        console.log("NEW FOLDER CREATED");
+      }
+    } 
+    else {
+      db_main.run("INSERT INTO msgfolders (mid, fid) VALUES (?,?)", [rows2.id, 56480]);
+    }
 
     await closeDatabase(db_main);
 
-    //mbody tablosuna bilgileri ekle. DONE!!!
+    //mbody db insertions
     const db_mbody = await openDatabase('mbody.db');
     db_mbody.run("INSERT INTO messages (uuid, data, type, enc) VALUES (?, ?, ?, ?)", [uuid, String(message), 2, 'UTF-8']);
     await closeDatabase(db_mbody);
-
-    /*
-    const db_contents = await openDatabase('blob1/contents.db');
-    db_contents.run("INSERT INTO messages (uuid, data, type) VALUES (?, ?, ?)", [uuid, String(message), 5]); //type icin 5 degeri tamamen sallama
-    await closeDatabase(db_contents);
-    */
-    
+   
     console.log("add_msg_tsx CALİSTİ!!!");
   } catch (err) {
     console.error(err.message);

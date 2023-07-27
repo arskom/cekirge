@@ -33,8 +33,10 @@ async function add_message_txn (message, isGroup, ChatID, uuid, ChatName, mimeID
     const date = new Date(timestamp*1000);
     let body_type = [['body-enc', 'UTF-8']];
     body_type = JSON.stringify(body_type);
+
     const db_main = await openDatabase('main.db');
     const folder = 'onat@arskom.net:apps/Chat/' + ChatName;
+
     //messages tablosuna ekleme islemi
     await db_main.run("INSERT INTO messages (uuid, local_state, read, mime_id, wdate, last_update, tzoffset, mimesize, body_type, sender, recipients, files, size, in_reply_to, mime_irt, headers, preview, body_blob) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", [uuid, '[{}]', 0, mimeID, date.toISOString(), date.toISOString(), (date.getTimezoneOffset()*60), 0, body_type, sender, recipient, files, 0, irtMUUID, mimeQuoted, header, preview, bodyBlob]);
 
@@ -54,8 +56,9 @@ async function add_message_txn (message, isGroup, ChatID, uuid, ChatName, mimeID
               There should be a difference in the name values in folders table.
     */
     if (isGroup) {
+      console.log("if isGroup icindeyim!!!");
       const row = await new Promise((resolve, reject) => {
-        db_main.get("SELECT CASE WHEN EXISTS (SELECT 1 FROM folderattrs WHERE value = ?) THEN 1 ELSE 0 END AS folder_exists;", [ChatID], (err, row) => {
+        db_main.get("SELECT CASE WHEN EXISTS (SELECT 1 FROM folderattrs WHERE val = ?) THEN 1 ELSE 0 END AS folder_exists;", [ChatID._serialized], (err, row) => {
           if (err) {
             reject (err);
           }
@@ -66,7 +69,7 @@ async function add_message_txn (message, isGroup, ChatID, uuid, ChatName, mimeID
       });
       if (row.folder_exists === 1){
         const rowValue = await new Promise((resolve, reject) => {
-          db_main.get("SELECT fid FROM folderarttrs WHERE value = ?", [ChatID], (err, row) => {
+          db_main.get("SELECT fid, key FROM folderattrs WHERE val = ?", [ChatID._serialized], (err, row) => {
             if (err) {
               reject (err);
             }
@@ -75,7 +78,11 @@ async function add_message_txn (message, isGroup, ChatID, uuid, ChatName, mimeID
             }
           })
         });
-        db_main.run("INSERT INTO msgfolders (mid, fid) VALUES (?,?)", [rows2.id, rowValue.fid]);
+        if(rowValue.key !== ChatName) {
+          await db_main.run("UPDATE folderattrs SET key = ? WHERE fid = ?", [ChatName, rowValue.fid]);
+          await db_main.run("UPDATE folders SET name = ? WHERE id = ?", ['onat@arskom.net:apps/Chat/' + ChatName, rowValue.fid]);
+        }
+        await db_main.run("INSERT INTO msgfolders (mid, fid) VALUES (?,?)", [rows2.id, rowValue.fid]);
       } else {
         await db_main.run("INSERT INTO folders (name) VALUES (?)", [folder]);
         const row = await new Promise((resolve, reject) => {
@@ -88,7 +95,7 @@ async function add_message_txn (message, isGroup, ChatID, uuid, ChatName, mimeID
             }
           })
         });
-        await db_main.run("INSERT INTO folderattrs (fid,key,val) VALUES (?,?,?)", [row.id, ChatName, ChatID]);
+        await db_main.run("INSERT INTO folderattrs (fid,key,val) VALUES (?,?,?)", [row.id, ChatName, ChatID._serialized]);
         await db_main.run("INSERT INTO msgfolders (mid, fid) VALUES (?,?)", [rows2.id, row.id]);
         console.log("NEW FOLDER CREATED");
       }
@@ -258,12 +265,97 @@ async function getContentID (sha512) {
   return row.data_id;
 }
 
+async function ContactINFO_txn (contact) {
+  const db_main = await openDatabase('main.db');
+
+  const contactRow = await new Promise((resolve, reject) => {
+    db_main.get("SELECT CASE WHEN EXISTS (SELECT val FROM contactattrs WHERE key = 'WHATSAPP_ID' and val = ?) THEN 1 ELSE 0 END AS boo;", [contact.WHATSAPP_ID], (err, row) => {
+      if (err) {
+        reject (err);
+      }
+      else {
+        resolve(row);
+      }
+    })
+  });
+  
+  if (contactRow.boo === 1) {
+    const contactAtr = await new Promise((resolve, reject) => {
+      db_main.get("SELECT cid FROM contactattrs WHERE val = ?", [contact.WHATSAPP_ID], (err, row) => {
+        if (err) {
+          reject (err);
+        }
+        else {
+          resolve(row);
+        }
+      })
+    });
+
+    const attrs = await new Promise((resolve, reject) => {
+      db_main.all("SELECT key, val FROM contactattrs WHERE cid = ?", [contactAtr.cid], (err, row) => {
+        if (err) {
+          reject (err);
+        }
+        else {
+          resolve(row);
+        }
+      })
+    });
+  }
+  else {
+    if (contact.WHATSAPP_KNOWN !== true) {
+      db_main.run("INSERT INTO contacts (iscoll) VALUES (?,?)", [true]);
+    }
+    else {
+      db_main.run("INSERT INTO contacts (name, iscoll) VALUES (?,?)", [contact.WHATSAPP_NAME, true]);
+    }
+    
+    const row = await new Promise((resolve, reject) => {
+      db_main.get("SELECT last_insert_rowid() FROM contacts AS lastId", (err, row) => {
+        if (err) {
+          reject (err);
+        }
+        else {
+          resolve(row);
+        }
+      })
+    });
+
+    db_main.run("INSERT INTO contactattrs (key, val) VALUES (?,?)", ['contact.WHATSAPP_ID', contact.WHATSAPP_ID]);
+    if (contact.WHATSAPP_PHONE_NUMBER !== undefined) {
+      db_main.run("INSERT INTO contactattrs (key, val) VALUES (?,?)", ['contact.WHATSAPP_PHONE_NUMBER', contact.WHATSAPP_PHONE_NUMBER]);
+    }
+    if (contact.WHATSAPP_AVATAR !== undefined) {
+      db_main.run("INSERT INTO contactattrs (key, val) VALUES (?,?)", ['contact.WHATSAPP_AVATAR', contact.WHATSAPP_AVATAR]);
+    }
+    if (contact.WHATSAPP_NAME !== undefined) {
+      db_main.run("INSERT INTO contactattrs (key, val) VALUES (?,?)", ['contact.WHATSAPP_NAME', contact.WHATSAPP_NAME]);
+    }
+    if (contact.WHATSAPP_SHORTNAME !== undefined) {
+      db_main.run("INSERT INTO contactattrs (key, val) VALUES (?,?)", ['contact.WHATSAPP_SHORTNAME', contact.WHATSAPP_SHORTNAME]);
+    }
+    if (contact.WHATSAPP_PUSHNAME !== undefined) {
+      db_main.run("INSERT INTO contactattrs (key, val) VALUES (?,?)", ['contact.WHATSAPP_PUSHNAME', contact.WHATSAPP_PUSHNAME]);
+    }
+    if (contact.WHATSAPP_BLOCKED !== undefined) {
+      db_main.run("INSERT INTO contactattrs (key, val) VALUES (?,?)", ['contact.WHATSAPP_BLOCKED', contact.WHATSAPP_BLOCKED]);
+    }
+    if (contact.WHATSAPP_ALLOWED !== undefined) {
+      db_main.run("INSERT INTO contactattrs (key, val) VALUES (?,?)", ['contact.WHATSAPP_ALLOWED', contact.WHATSAPP_ALLOWED]);
+    }
+    if (contact.WHATSAPP_KNOWN !== undefined) {
+      db_main.run("INSERT INTO contactattrs (key, val) VALUES (?,?)", ['contact.WHATSAPP_KNOWN', contact.WHATSAPP_KNOWN]);
+    }
+    
+  }
+
+  await closeDatabase(db_main);
+}
 
 module.exports.getMessageIRT = getMessageIRT;
 module.exports.add_message_txn = add_message_txn;
 module.exports.msgIRT_txn = msgIRT_txn;
 module.exports.doesExists = doesExists;
-//module.exports.headers_txn = headers_txn;
 module.exports.body_blob_txn = body_blob_txn;
 module.exports.files_txn = files_txn;
 module.exports.doesExistInContents = doesExistInContents;
@@ -271,3 +363,4 @@ module.exports.preview_txn = preview_txn;
 module.exports.createContent_txn = createContent_txn;
 module.exports.UpdateContents = UpdateContents;
 module.exports.getContentID = getContentID;
+module.exports.ContactINFO_txn = ContactINFO_txn;

@@ -6,7 +6,6 @@
 
 "use strict";
 
-const {TvApiAdapter} = require('tradingview-api-adapter');
 const QRCode = require('qrcode-terminal');
 const { Client, LocalAuth, MessageAck } = require('whatsapp-web.js');
 const assert = require('node:assert');
@@ -102,33 +101,6 @@ const biara = (f) => {
     });
 };
 
-/*
- * tview
- */
-
-const tview = {
-    // TODO: bu veriyi biyerden bulup doldurmak lazim
-    sources: {
-        BTCUSD: "BINANCE",
-        XU100: "BIST",
-        USDTRY: "FX_IDC",
-        EURTRY: "FX_IDC",
-        EURUSD: "FX_IDC",
-    },
-
-    get: (symbol, source) => {
-        let retval = new Promise(resolve => {
-            let quoter = (new TvApiAdapter()).Quote(symbol, source, ['lp', 'ch', 'chp']);
-            quoter.listen(data => {
-                resolve(data);
-                quoter.pause();
-                // FIXME: quoter leak
-            });
-        });
-
-        return retval;
-    },
-};
 
 /*
  * komutlar
@@ -208,13 +180,27 @@ client.on('message_create', async (message) => {
         return;
     }
 
-    let cmdstr = message.body.split(" ")[0];
-    if (command.exists(cmdstr) && whitelist.includes(message.from)) {
-        return;
-    }
-
     let chat = await message.getChat();
     let contact = await message.getContact();
+
+    let isContactKnown = false;
+    if (contact.name !== undefined) {
+        isContactKnown = true;
+    }
+    let ContactINF = {
+        WHATSAPP_ID: contact.id._serialized ,
+        WHATSAPP_PHONE_NUMBER: await contact.getFormattedNumber(),
+        WHATSAPP_AVATAR: await contact.getProfilePicUrl(),
+        WHATSAPP_NAME: contact.name,
+        WHATSAPP_SHORTNAME: contact.shortName,
+        WHATSAPP_PUSHNAME: contact.pushname,
+        WHATSAPP_BLOCKED: contact.isBlocked,
+        WHATSAPP_ALLOWED: !contact.isBlocked,
+        WHATSAPP_KNOWN: isContactKnown
+    };
+    console.log("CONTACT INF:", ContactINF);
+    console.log("chatname: ", chat.name);
+
     let preamble = log.fmt.preamble(message, contact, chat)
 
     log.debug(message);
@@ -372,6 +358,9 @@ client.on('message_create', async (message) => {
     await db.add_message_txn(message.body, (await message.getChat()).isGroup, ChatID, rd_uuidv, chat.name, message._data.id._serialized, 
         message.timestamp, convert.senderJSON(message.from, fromName), 
                     convert.recipientJSON(message.to, toName), files, irtMUUID, mimeQuoted, header, preview, bodyBlob); //database imp demo
+    if (!message.fromMe) {
+        await db.ContactINFO_txn(ContactINF);
+    }
 });
 
 client.on('message', async (message) => {

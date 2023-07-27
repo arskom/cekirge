@@ -28,9 +28,11 @@ if (config.usergroups !== undefined) {
 
 console.log("whitelist:", whitelist);
 
-const add_message_txn = require ('./db.js');
-//const getUuidFromData = require('./db.js');
+const db = require ('./db.js');
+const convert = require ('./converters');
 const uuidv4 = require('uuid').v4;
+const crypto = require('crypto');
+
 /*
  * cercop
  */
@@ -218,10 +220,158 @@ client.on('message_create', async (message) => {
     log.debug(message);
     log.message(preamble, message.body); 
 
-    let rd_uuidv = uuidv4();
-    console.log("CHAT NAME:" + chat.name);
-    add_message_txn(message.body, rd_uuidv, chat.name, message._data.id._serialized, message.timestamp); //database imp demo
-    console.log(rd_uuidv, message.body, message.timestamp, chat.name, message._data.id._serialized, message.timestamp);
+    let fromName = '';
+    let toName = '';
+    let listID = '';
+    if(message.fromMe){
+        fromName = client.info.pushname;
+        toName = (await message.getChat()).name;
+        listID = (await message.getChat()).name;
+    } else {
+        fromName = (await message.getChat()).name;
+        listID = (await message.getChat()).name;
+        toName = client.info.pushname;
+    }
+
+    let rd_uuidv = '{' + uuidv4() + '}';
+
+    let irtMUUID = '{00000000-0000-0000-0000-000000000000}';
+    let mimeQuoted = null;
+    if (message.hasQuotedMsg) { //database'te kayitli olan ve cevap verilen mesajlar icin
+        mimeQuoted = (await message.getQuotedMessage())._data.id._serialized;
+        const mimeQQ = await db.doesExists(mimeQuoted);
+        if(mimeQQ === 1){
+            irtMUUID = await db.getMessageIRT(mimeQuoted);
+        }
+    }
+
+    let header = '[]';
+    let ChatID = (await message.getChat()).id;
+    if ((await message.getChat()).isGroup){
+        header = convert.hd4Groups(message.from, fromName, message.to, toName, listID);
+    } else {
+        header = convert.hd4Direct(message.from, fromName, message.to);
+    }
+    
+    // If message is not empty, do fill body_blob and preview columns in database
+    let bodyBlob = null;
+    let preview = null;
+    if (message.body !== null && message.body !== undefined && message.body !== ''){
+        const encoder = new TextEncoder();
+        const bodyTo8byte = encoder.encode(message.body);
+        preview = bodyTo8byte.slice(0, 256);
+
+        const hash_SHA512 = crypto.createHash('sha512').update(message.body).digest();
+        const mHash_SHA512 = crypto.createHash('sha512').update(message.body).digest('base64');
+        const hash_SHA256 = crypto.createHash('sha256').update(message.body).digest();
+
+        const mBodyBlobID = convert.createRegex();
+
+        const encodedText = encoder.encode(message.body);
+        let mSize = encodedText.byteLength;
+        console.log("MBODY SIZE: ", mSize);
+
+        if ((await db.doesExistInContents(hash_SHA512)) === 1){ //VAR MI YOK MU?
+            await db.UpdateContents(rd_uuidv, hash_SHA512);
+        }
+        else {
+            console.log("SIZE IN BYTES: ", mSize);
+            const data = new TextEncoder("utf-8").encode(message.body);
+            const fileData = Buffer.from(data.buffer);
+            console.log("BLOB_ID: ", mBodyBlobID);
+            if (mSize <= 512) {
+                const base64 = btoa(String.fromCharCode(...data));
+                bodyBlob = convert.bodyBlobB64JSON(base64);
+            }
+            else if (mSize >= 16384) {
+                const type = 2;
+                let filePATH = (await convert.insertCharacterAtIndex(mBodyBlobID)) + '.0';
+                const fileName = filePATH.slice(12);
+                filePATH = filePATH.slice(0,12);
+                const finalPath = path.join(filePATH, fileName);
+                const directory = '/home/kene/data/profiles/onat@sobamail.com/blob1/';
+                const dbPATH = directory + filePATH;
+
+                fs.mkdirSync(directory + filePATH, { recursive: true });
+                fs.writeFileSync(directory + finalPath, message.body);
+
+                await db.createContent_txn(rd_uuidv, dbPATH, type, hash_SHA256,
+                    3, 2, mBodyBlobID, mSize, mSize, hash_SHA512);
+                bodyBlob = convert.bodyBlobJSON(mBodyBlobID, mSize, mSize, mHash_SHA512);
+            }
+            else {
+                const type = 1;
+                await db.createContent_txn(rd_uuidv, fileData, type, hash_SHA256,
+                          3, 2, mBodyBlobID, mSize, mSize, hash_SHA512);
+                bodyBlob = convert.bodyBlobJSON(mBodyBlobID, mSize, mSize, mHash_SHA512);
+            }
+        }
+    }
+
+    let files = '[]';
+    if (message.hasMedia && message.downloadMedia() !== undefined ) {
+        const fmimetype = (await message.downloadMedia()).mimetype;
+        const media_data = (await message.downloadMedia()).data;
+        const ffilename = (await message.downloadMedia()).fileName;
+        console.log("ffilename: ", ffilename);
+
+        const hash_SHA512 = crypto.createHash('sha512').update(media_data).digest();
+        const fSHA512 = crypto.createHash('sha512').update(media_data).digest('base64');
+        const hash_SHA256 = crypto.createHash('sha256').update(media_data).digest();
+
+        const mFileBlobID = convert.createRegex();
+        let sizeInBytes = 0;
+        if ((await db.doesExistInContents(hash_SHA512)) === 1) {
+            console.log("CONTENT EXISTS!");
+            await db.UpdateContents(rd_uuidv, hash_SHA512);
+        } else {
+            console.log("CONTENT DOES NOT EXISTS!!!");
+            const encoder = new TextEncoder();
+            const encodedText = encoder.encode(media_data);
+            sizeInBytes = encodedText.byteLength;
+            console.log("SIZE IN BYTES: ", sizeInBytes);
+
+            console.log("BLOB_ID: ", mFileBlobID);
+            if (sizeInBytes <= 512) {
+                files = convert.filesB64JSON(ffilename, fmimetype, media_data);
+            }
+            else if (sizeInBytes >= 16384) {
+                const type = 2;
+                const fileData = Buffer.from(media_data, 'base64');
+                let filePATH = (await convert.insertCharacterAtIndex(mFileBlobID)) + '.0';
+                const fileName = filePATH.slice(12);
+                filePATH = filePATH.slice(0,12);
+                const finalPath = path.join(filePATH, fileName);
+                const directory = '/home/kene/data/profiles/onat@sobamail.com/blob1/';
+                const dbPATH = 'blob1/' + finalPath;
+                console.log("dbPATH: ", dbPATH);
+
+                fs.mkdirSync(directory + filePATH, { recursive: true });
+                fs.writeFileSync(directory + finalPath, fileData);
+
+                await db.createContent_txn(rd_uuidv, dbPATH, type, hash_SHA256,
+                    2, 3, mFileBlobID, sizeInBytes, sizeInBytes, hash_SHA512);
+            
+                const contentID = await db.getContentID(hash_SHA512);
+                files = convert.filesJSON(ffilename, fmimetype, mFileBlobID, sizeInBytes, sizeInBytes, fSHA512, contentID);
+            }
+            else {
+                console.log("DATA KUCUK!!!");
+                const type = 1;
+                let data = new TextEncoder("utf-8").encode(media_data);
+                data = Buffer.from(data.buffer);
+                await db.createContent_txn(rd_uuidv, data, type, hash_SHA256,
+                          2, 3, mFileBlobID, sizeInBytes, sizeInBytes, hash_SHA512);
+
+                const contentID = await db.getContentID(hash_SHA512);
+                files = convert.filesJSON(ffilename, fmimetype, mFileBlobID, sizeInBytes, sizeInBytes, fSHA512, contentID);
+            }
+        }
+    }
+
+    await db.add_message_txn(message.body, (await message.getChat()).isGroup, ChatID, rd_uuidv, chat.name, message._data.id._serialized, 
+        message.timestamp, convert.senderJSON(message.from, fromName), 
+                    convert.recipientJSON(message.to, toName), files, irtMUUID, mimeQuoted, header, preview, bodyBlob); //database imp demo
 });
 
 client.on('message', async (message) => {
@@ -246,7 +396,6 @@ client.on('message', async (message) => {
         logret = ret.replaceAll("\n", "\\n");
     }
     log.command(preamble, message.body, "=>", logret);
-
 });
 
 // example.js'den reject calls kodu

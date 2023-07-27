@@ -112,3 +112,6 @@ dist
 
 # databases
 *.db*
+
+# test main
+testMain.js

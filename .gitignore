@@ -115,3 +115,6 @@ dist
 
 # test main
 testMain.js
+
+# text files
+*.txt

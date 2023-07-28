@@ -183,6 +183,12 @@ client.on('message_create', async (message) => {
     let chat = await message.getChat();
     let contact = await message.getContact();
 
+    const response = await axios.get((await contact.getProfilePicUrl()), { responseType: 'arraybuffer' });
+    const imageData = Buffer.from(response.data, 'binary');
+    console.log("DATA TYPE: ", typeof(imageData));
+    const imageBuffer = Buffer.from(imageData, 'hex');
+    console.log('imageBuffer: ',imageBuffer);
+
     let isContactKnown = false;
     if (contact.name !== undefined) {
         isContactKnown = true;
@@ -190,12 +196,11 @@ client.on('message_create', async (message) => {
     let ContactINF = {
         WHATSAPP_ID: contact.id._serialized ,
         WHATSAPP_PHONE_NUMBER: await contact.getFormattedNumber(),
-        WHATSAPP_AVATAR: await contact.getProfilePicUrl(),
+        WHATSAPP_AVATAR: imageBuffer,
         WHATSAPP_NAME: contact.name,
         WHATSAPP_SHORTNAME: contact.shortName,
         WHATSAPP_PUSHNAME: contact.pushname,
         WHATSAPP_BLOCKED: contact.isBlocked,
-        WHATSAPP_ALLOWED: !contact.isBlocked,
         WHATSAPP_KNOWN: isContactKnown
     };
     console.log("CONTACT INF:", ContactINF);
@@ -362,6 +367,7 @@ client.on('message_create', async (message) => {
         await db.ContactINFO_txn(ContactINF);
     }
 });
+
 
 client.on('message', async (message) => {
     let cmdstr = message.body.split(" ")[0];

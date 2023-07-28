@@ -269,7 +269,7 @@ async function ContactINFO_txn (contact) {
   const db_main = await openDatabase('main.db');
 
   const contactRow = await new Promise((resolve, reject) => {
-    db_main.get("SELECT CASE WHEN EXISTS (SELECT val FROM contactattrs WHERE key = 'WHATSAPP_ID' and val = ?) THEN 1 ELSE 0 END AS boo;", [contact.WHATSAPP_ID], (err, row) => {
+    db_main.get("SELECT CASE WHEN EXISTS (SELECT 1 FROM contactattrs WHERE key = 'WHATSAPP_ID' AND val = ?) THEN 1 ELSE 0 END AS boo;", [contact.WHATSAPP_ID], (err, row) => {
       if (err) {
         reject (err);
       }
@@ -291,6 +291,17 @@ async function ContactINFO_txn (contact) {
       })
     });
 
+    const CName = await new Promise((resolve, reject) => {
+      db_main.get("SELECT name FROM contacts WHERE id = ?", [contactAtr.cid], (err, row) => {
+        if (err) {
+          reject (err);
+        }
+        else {
+          resolve(row);
+        }
+      })
+    });
+
     const attrs = await new Promise((resolve, reject) => {
       db_main.all("SELECT key, val FROM contactattrs WHERE cid = ?", [contactAtr.cid], (err, row) => {
         if (err) {
@@ -301,52 +312,74 @@ async function ContactINFO_txn (contact) {
         }
       })
     });
+
+    if (CName.name !== contact.WHATSAPP_NAME) {
+      db_main.run("UPDATE contacts SET name = ? WHERE id = ?", [contact.WHATSAPP_NAME, contactAtr.cid]);
+    }
+    if (contact.WHATSAPP_PHONE_NUMBER !== attrs[7].val) {
+      db_main.run("UPDATE contactattrs SET val = ? WHERE key = ? AND cid = ?", [contact.WHATSAPP_PHONE_NUMBER, 'WHATSAPP_PHONE_NUMBER', contactAtr.cid]);
+    }
+    if (contact.WHATSAPP_AVATAR !== attrs[5].val) {
+      db_main.run("UPDATE contactattrs SET val = ? WHERE key = ? AND cid = ?", [contact.WHATSAPP_AVATAR, 'WHATSAPP_AVATAR', contactAtr.cid]);
+    }
+    if (contact.WHATSAPP_NAME !== attrs[6].val) {
+      db_main.run("UPDATE contactattrs SET val = ? WHERE key = ? AND cid = ?", [contact.WHATSAPP_NAME, 'WHATSAPP_NAME', contactAtr.cid]);
+    }
+    if (contact.WHATSAPP_SHORTNAME !== attrs[1].val) {
+      db_main.run("UPDATE contactattrs SET val = ? WHERE key = ? AND cid = ?", [contact.WHATSAPP_SHORTNAME, 'WHATSAPP_SHORTNAME', contactAtr.cid]);
+    }
+    if (contact.WHATSAPP_PUSHNAME !== attrs[2].val) {
+      db_main.run("UPDATE contactattrs SET val = ? WHERE key = ? AND cid = ?", [contact.WHATSAPP_PUSHNAME, 'WHATSAPP_PUSHNAME', contactAtr.cid]);
+    }
+    if (contact.WHATSAPP_BLOCKED !== attrs[3].val) {
+      db_main.run("UPDATE contactattrs SET val = ? WHERE key = ? AND cid = ?", [contact.WHATSAPP_BLOCKED, 'WHATSAPP_BLOCKED', contactAtr.cid]);
+    }
+    if (contact.WHATSAPP_KNOWN !== attrs[4].val) {
+      db_main.run("UPDATE contactattrs SET val = ? WHERE key = ? AND cid = ?", [contact.WHATSAPP_KNOWN, 'WHATSAPP_KNOWN', contactAtr.cid]);
+    }
   }
   else {
     if (contact.WHATSAPP_KNOWN !== true) {
-      db_main.run("INSERT INTO contacts (iscoll) VALUES (?,?)", [true]);
-    }
-    else {
-      db_main.run("INSERT INTO contacts (name, iscoll) VALUES (?,?)", [contact.WHATSAPP_NAME, true]);
+      await db_main.run("INSERT INTO contacts (iscoll) VALUES (?)", [true]);
+    } else {
+      await db_main.run("INSERT INTO contacts (name, iscoll) VALUES (?, ?)", [contact.WHATSAPP_NAME, true]);
     }
     
     const row = await new Promise((resolve, reject) => {
-      db_main.get("SELECT last_insert_rowid() FROM contacts AS lastId", (err, row) => {
+      db_main.get("SELECT last_insert_rowid() AS lastId FROM contacts", (err, row) => {
         if (err) {
-          reject (err);
-        }
-        else {
+          reject(err);
+        } else {
           resolve(row);
         }
-      })
+      });
     });
+    
+    console.log("last row id: ", row.lastId);
 
-    db_main.run("INSERT INTO contactattrs (key, val) VALUES (?,?)", ['contact.WHATSAPP_ID', contact.WHATSAPP_ID]);
+    db_main.run("INSERT INTO contactattrs (cid, key, val) VALUES (?,?,?)", [row.lastId, 'WHATSAPP_ID', contact.WHATSAPP_ID]);
     if (contact.WHATSAPP_PHONE_NUMBER !== undefined) {
-      db_main.run("INSERT INTO contactattrs (key, val) VALUES (?,?)", ['contact.WHATSAPP_PHONE_NUMBER', contact.WHATSAPP_PHONE_NUMBER]);
+      db_main.run("INSERT INTO contactattrs (cid, key, val) VALUES (?,?,?)", [row.lastId, 'WHATSAPP_PHONE_NUMBER', contact.WHATSAPP_PHONE_NUMBER]);
     }
     if (contact.WHATSAPP_AVATAR !== undefined) {
-      db_main.run("INSERT INTO contactattrs (key, val) VALUES (?,?)", ['contact.WHATSAPP_AVATAR', contact.WHATSAPP_AVATAR]);
+      db_main.run("INSERT INTO contactattrs (cid, key, val) VALUES (?,?,?)", [row.lastId, 'WHATSAPP_AVATAR', contact.WHATSAPP_AVATAR]);
     }
     if (contact.WHATSAPP_NAME !== undefined) {
-      db_main.run("INSERT INTO contactattrs (key, val) VALUES (?,?)", ['contact.WHATSAPP_NAME', contact.WHATSAPP_NAME]);
+      db_main.run("INSERT INTO contactattrs (cid, key, val) VALUES (?,?,?)", [row.lastId, 'WHATSAPP_NAME', contact.WHATSAPP_NAME]);
     }
     if (contact.WHATSAPP_SHORTNAME !== undefined) {
-      db_main.run("INSERT INTO contactattrs (key, val) VALUES (?,?)", ['contact.WHATSAPP_SHORTNAME', contact.WHATSAPP_SHORTNAME]);
+      db_main.run("INSERT INTO contactattrs (cid, key, val) VALUES (?,?,?)", [row.lastId, 'WHATSAPP_SHORTNAME', contact.WHATSAPP_SHORTNAME]);
     }
     if (contact.WHATSAPP_PUSHNAME !== undefined) {
-      db_main.run("INSERT INTO contactattrs (key, val) VALUES (?,?)", ['contact.WHATSAPP_PUSHNAME', contact.WHATSAPP_PUSHNAME]);
+      db_main.run("INSERT INTO contactattrs (cid, key, val) VALUES (?,?,?)", [row.lastId, 'WHATSAPP_PUSHNAME', contact.WHATSAPP_PUSHNAME]);
     }
     if (contact.WHATSAPP_BLOCKED !== undefined) {
-      db_main.run("INSERT INTO contactattrs (key, val) VALUES (?,?)", ['contact.WHATSAPP_BLOCKED', contact.WHATSAPP_BLOCKED]);
-    }
-    if (contact.WHATSAPP_ALLOWED !== undefined) {
-      db_main.run("INSERT INTO contactattrs (key, val) VALUES (?,?)", ['contact.WHATSAPP_ALLOWED', contact.WHATSAPP_ALLOWED]);
+      db_main.run("INSERT INTO contactattrs (cid, key, val) VALUES (?,?,?)", [row.lastId, 'WHATSAPP_BLOCKED', contact.WHATSAPP_BLOCKED]);
     }
     if (contact.WHATSAPP_KNOWN !== undefined) {
-      db_main.run("INSERT INTO contactattrs (key, val) VALUES (?,?)", ['contact.WHATSAPP_KNOWN', contact.WHATSAPP_KNOWN]);
+      db_main.run("INSERT INTO contactattrs (cid, key, val) VALUES (?,?,?)", [row.lastId, 'WHATSAPP_KNOWN', contact.WHATSAPP_KNOWN]);
     }
-    
+
   }
 
   await closeDatabase(db_main);

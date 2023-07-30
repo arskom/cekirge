@@ -280,28 +280,31 @@ async function ContactINFO_txn (contact) {
   });
 
   let contactCid;
-  contactCid = contactRow.cid;
-  console.log("CID: ", contactCid);
-
-  db_main.serialize(function() {
-    db_main.run("BEGIN");
   if (contactRow !== undefined && contactRow.cid !== undefined) {
-    db_main.run("UPDATE contacts SET name = ? WHERE id = ?", [contact.WHATSAPP_NAME, contactCid]);
+    contactCid = contactRow.cid;
+    await db_main.run("UPDATE contacts SET name = ? WHERE id = ?", [contact.WHATSAPP_NAME, contactCid]);
   } 
   else {
     console.log("contact info else 1");
-    let row;
     if (contact.WHATSAPP_KNOWN !== true) {
-      row = db_main.run("INSERT INTO contacts (iscoll) VALUES (?) RETURNING id", [true]);
-      console.log("row.id if icinde: ", row.id);
+      await db_main.run("INSERT INTO contacts (iscoll) VALUES (?)", [true]);
     } else {
-      row = db_main.run("INSERT INTO contacts (name, iscoll) VALUES (?, ?) RETURNING id", [contact.WHATSAPP_NAME, true]);
+      await db_main.run("INSERT INTO contacts (name, iscoll) VALUES (?, ?)", [contact.WHATSAPP_NAME, true]);
     }
-    
-    contactCid = row.id;
+    const row = await new Promise((resolve, reject) => {
+      db_main.get("SELECT last_insert_rowid() AS lastID FROM contacts", (err, row) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(row);
+        }
+      });
+    });
+    contactCid = row.lastID
     console.log("contactCid: ", contactCid);
   }
-  
+
+  db_main.serialize(function() {
     db_main.run("DELETE FROM contactattrs WHERE cid = ?", [contactCid]);
     db_main.run("INSERT INTO contactattrs (cid, key, val) VALUES (?,?,?) --1", [contactCid, 'WHATSAPP_ID', contact.WHATSAPP_ID]);
     if ( contact.WHATSAPP_PHONE_NUMBER !== undefined) {
@@ -325,9 +328,7 @@ async function ContactINFO_txn (contact) {
     if ( contact.WHATSAPP_KNOWN !== undefined) {
       db_main.run("INSERT INTO contactattrs (cid, key, val) VALUES (?,?,?) --8", [contactCid, 'WHATSAPP_KNOWN',  contact.WHATSAPP_KNOWN]);
     }
-    db_main.run("COMMIT  --9");
   });
-
   await closeDatabase(db_main);
 }
 

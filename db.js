@@ -248,10 +248,11 @@ async function UpdateContents (uuid, hash) {
     })
   });
   
-  db_contents.get("INSERT INTO blobs (partype, parid, parsubid, blob_id, size, csize, sha512, data_id) VALUES (?,?,?,?,?,?,?,?) RETURNING *", [row.partype, uuid, row.parid, row.blob_id, row.size, row.csize, row.sha512, row.data_id]);
+  db_contents.run("INSERT INTO blobs (partype, parid, parsubid, blob_id, size, csize, sha512, data_id) VALUES (?,?,?,?,?,?,?,?) RETURNING *", [row.partype, uuid, row.parid, row.blob_id, row.size, row.csize, row.sha512, row.data_id]);
 
   await closeDatabase(db_contents);
   console.log("ROW: ", row);  
+  return row;
 }
 
 async function getContentID (sha512) {
@@ -356,20 +357,16 @@ async function contentsAll_txn (uuid, ImgData, regex, cid) {
   console.log(await doesExistInContents(hash_SHA512));
   if ((await doesExistInContents(hash_SHA512)) === 1) {
     console.log("AVATAR EXISTS!");
-    await UpdateContents(uuid, hash_SHA512);
+    const row = await UpdateContents(uuid, hash_SHA512);
     await closeDatabase(db_contents);
-    return;
+    return {_data: row.blob_id};
   }
   else {
     console.log("AVATAR DOES NOT EXIST!");
     const encoder = new TextEncoder();
     const encodedDATA = encoder.encode(ImgData);
     sizeInB = encodedDATA.byteLength;
-    if (sizeInB <= 512) {
-      await closeDatabase(db_contents);
-      return;
-    }
-    else if (sizeInB > 16384) {
+    if (sizeInB > 16384) {
       // IN PROGRESS
       const type = 2;
       const fileData = Buffer.from(ImgData, 'base64');
@@ -400,7 +397,7 @@ async function contentsAll_txn (uuid, ImgData, regex, cid) {
       const contentID = await createContent_txn(uuid, dbPATH, type, hash_SHA256,
           4, cid, regex, sizeInB, sizeInB, hash_SHA512);
       await closeDatabase(db_contents);
-          return {_dbPATH: dbPATH, 
+          return {_data: dbPATH, 
               _regex: regex, 
               _sizeInB: sizeInB,  
               _hash_SHA512: hash_SHA512,

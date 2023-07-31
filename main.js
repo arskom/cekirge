@@ -340,10 +340,8 @@ client.on('message_create', async (message) => {
                 fs.mkdirSync(directory + filePATH, { recursive: true });
                 fs.writeFileSync(directory + finalPath, fileData);
 
-                await db.createContent_txn(rd_uuidv, dbPATH, type, hash_SHA256,
+                const contentID = await db.createContent_txn(rd_uuidv, dbPATH, type, hash_SHA256,
                     2, 3, mFileBlobID, sizeInBytes, sizeInBytes, hash_SHA512);
-            
-                const contentID = await db.getContentID(hash_SHA512);
                 files = convert.filesJSON(ffilename, fmimetype, mFileBlobID, sizeInBytes, sizeInBytes, fSHA512, contentID);
             }
             else {
@@ -351,22 +349,56 @@ client.on('message_create', async (message) => {
                 const type = 1;
                 let data = new TextEncoder("utf-8").encode(media_data);
                 data = Buffer.from(data.buffer);
-                await db.createContent_txn(rd_uuidv, data, type, hash_SHA256,
+                const contentID = await db.createContent_txn(rd_uuidv, data, type, hash_SHA256,
                           2, 3, mFileBlobID, sizeInBytes, sizeInBytes, hash_SHA512);
-
-                const contentID = await db.getContentID(hash_SHA512);
                 files = convert.filesJSON(ffilename, fmimetype, mFileBlobID, sizeInBytes, sizeInBytes, fSHA512, contentID);
             }
         }
     }
 
+
+
     await db.add_message_txn(message.body, (await message.getChat()).isGroup, ChatID, rd_uuidv, chat.name, message._data.id._serialized, 
         message.timestamp, convert.senderJSON(message.from, fromName), 
                     convert.recipientJSON(message.to, toName), files, irtMUUID, mimeQuoted, header, preview, bodyBlob); //database imp demo
+                    
     if (!message.fromMe) {
+        const response = await axios.get((await contact.getProfilePicUrl()), { responseType: 'arraybuffer' });
+        const imageData = Buffer.from(response.data, 'binary');
+        console.log("DATA TYPE: ", typeof(imageData));
+        let avatarData;
+    
+        let isContactKnown = false;
+        if (contact.name !== undefined) {
+            isContactKnown = true;
+        }
+        const wpAvatarReg = convert.createRegex();
+        
+        if (imageData.byteLength <=512) {
+            avatarData = imageData.toString('base64');
+        } else {
+            const contentF = await db.contentsAll_txn(rd_uuidv, imageData, wpAvatarReg);
+            avatarData = contentF._data;
+        }
+    
+    
+        let ContactINF = {
+            WHATSAPP_ID: contact.id._serialized ,
+            WHATSAPP_PHONE_NUMBER: await contact.getFormattedNumber(),
+            WHATSAPP_AVATAR: avatarData,
+            WHATSAPP_NAME: contact.name,
+            WHATSAPP_SHORTNAME: contact.shortName,
+            WHATSAPP_PUSHNAME: contact.pushname,
+            WHATSAPP_BLOCKED: contact.isBlocked,
+            WHATSAPP_KNOWN: isContactKnown
+        };
+        console.log("CONTACT INF:", ContactINF);
+        console.log("chatname: ", chat.name);
+    
         await db.ContactINFO_txn(ContactINF);
     }
 });
+
 
 
 client.on('message', async (message) => {

@@ -1,5 +1,9 @@
 //database manipulasyonu icin burayi kullanacagim
 const sqlite3 = require('sqlite3').verbose();
+const crypto = require('crypto');
+const convert = require('./converters');
+const path = require('path');
+const fs = require('fs');
 
 function openDatabase(str) {
   return new Promise((resolve, reject) => {
@@ -227,6 +231,7 @@ async function createContent_txn(uuid, data, type, csha256, partype, parsubid, b
     "INSERT INTO blobs (partype, parid, parsubid, blob_id, size, csize, sha512, data_id) VALUES (?,?,?,?,?,?,?,?)",
                [partype, uuid, parsubid, blob_id, size, csize, sha512, row.id]);
   await closeDatabase(db_contents);
+  return row.id;
 }
 
 async function UpdateContents (uuid, hash) {
@@ -243,7 +248,7 @@ async function UpdateContents (uuid, hash) {
     })
   });
   
-  db_contents.run("INSERT INTO blobs (partype, parid, parsubid, blob_id, size, csize, sha512, data_id) VALUES (?,?,?,?,?,?,?,?)", [row.partype, uuid, row.parid, row.blob_id, row.size, row.csize, row.sha512, row.data_id]);
+  db_contents.get("INSERT INTO blobs (partype, parid, parsubid, blob_id, size, csize, sha512, data_id) VALUES (?,?,?,?,?,?,?,?) RETURNING *", [row.partype, uuid, row.parid, row.blob_id, row.size, row.csize, row.sha512, row.data_id]);
 
   await closeDatabase(db_contents);
   console.log("ROW: ", row);  
@@ -285,22 +290,32 @@ async function ContactINFO_txn (contact) {
     await db_main.run("UPDATE contacts SET name = ? WHERE id = ?", [contact.WHATSAPP_NAME, contactCid]);
   } 
   else {
+    let row;
     console.log("contact info else 1");
     if (contact.WHATSAPP_KNOWN !== true) {
-      await db_main.run("INSERT INTO contacts (iscoll) VALUES (?)", [true]);
+      row = await new Promise((resolve, reject) => {
+        db_main.get("INSERT INTO contacts (iscoll) VALUES (?) RETURNING id;", [true], (err, row) => {
+          if (err) {
+            reject (err);
+          }
+          else {
+            resolve(row);
+          }
+        })
+      });
     } else {
-      await db_main.run("INSERT INTO contacts (name, iscoll) VALUES (?, ?)", [contact.WHATSAPP_NAME, true]);
-    }
-    const row = await new Promise((resolve, reject) => {
-      db_main.get("SELECT last_insert_rowid() AS lastID FROM contacts", (err, row) => {
+      row = await new Promise((resolve, reject) => {
+      db_main.get("INSERT INTO contacts (name, iscoll) VALUES (?,?) RETURNING id;", [contact.WHATSAPP_NAME, true], (err, row) => {
         if (err) {
-          reject(err);
-        } else {
+          reject (err);
+        }
+        else {
           resolve(row);
         }
-      });
+      })
     });
-    contactCid = row.lastID
+    }
+    contactCid = row.id
     console.log("contactCid: ", contactCid);
   }
 
@@ -332,6 +347,114 @@ async function ContactINFO_txn (contact) {
   await closeDatabase(db_main);
 }
 
+async function contentsAll_txn (uuid, ImgData, regex, cid) {
+  const hash_SHA512 = crypto.createHash('sha512').update(ImgData).digest();
+  const hash_SHA256 = crypto.createHash('sha256').update(ImgData).digest();
+
+  let sizeInB;
+  const db_contents = await openDatabase('blob1/contents.db');
+  console.log(await doesExistInContents(hash_SHA512));
+  if ((await doesExistInContents(hash_SHA512)) === 1) {
+    console.log("AVATAR EXISTS!");
+    await UpdateContents(uuid, hash_SHA512);
+    await closeDatabase(db_contents);
+    return;
+  }
+  else {
+    console.log("AVATAR DOES NOT EXIST!");
+    const encoder = new TextEncoder();
+    const encodedDATA = encoder.encode(ImgData);
+    sizeInB = encodedDATA.byteLength;
+    if (sizeInB <= 512) {
+      await closeDatabase(db_contents);
+      return;
+    }
+    else if (sizeInB > 16384) {
+      // IN PROGRESS
+      const type = 2;
+      const fileData = Buffer.from(ImgData, 'base64');
+      let filePATH = (await convert.insertCharacterAtIndex(regex)) + '.0';
+      const fileName = filePATH.slice(12);
+      filePATH = filePATH.slice(0,12);
+      const finalPath = path.join(filePATH, fileName);
+      const directory = '/home/kene/data/profiles/onat@sobamail.com/blob1/';
+      const dbPATH = 'blob1/' + finalPath;
+      console.log("dbPATH: ", dbPATH);
+
+      fs.mkdirSync(path.dirname(directory + finalPath), { recursive: true }, (err) => {
+        if (err) {
+          console.error(err);
+        } else {
+          console.log('Directory created successfully!');
+        }
+      });
+      
+      fs.writeFile(directory + finalPath, fileData,  (err) => {
+        if (err) {
+          console.error(err);
+        } else {
+          console.log('File written successfully!');
+        }
+      });
+
+      const contentID = await createContent_txn(uuid, dbPATH, type, hash_SHA256,
+          4, cid, regex, sizeInB, sizeInB, hash_SHA512);
+      await closeDatabase(db_contents);
+          return {_dbPATH: dbPATH, 
+              _regex: regex, 
+              _sizeInB: sizeInB,  
+              _hash_SHA512: hash_SHA512,
+              _contentID: contentID
+            };
+    }
+    else {
+      // IN PROGRESS
+      const type = 1;
+      let data = new TextEncoder("utf-8").encode(ImgData);
+      data = Buffer.from(data.buffer);
+      const contentID = await createContent_txn(rd_uuidv, data, type, hash_SHA256,
+                4, cid, regex, sizeInB, sizeInB, hash_SHA512);
+      await closeDatabase(db_contents);
+      return {_data: data,
+              _regex: regex, 
+              _sizeInB: sizeInB,  
+              _hash_SHA512: hash_SHA512,
+              _contentID: contentID
+            };
+    }
+  }
+}
+
+async function getContactAttrs (WHATSAPP_ID) {
+  const db_main = await openDatabase('main.db');
+  const row = await new Promise((resolve, reject) => {
+    db_main.get("SELECT cid FROM contactattrs WHERE key = 'WHATSAPP_ID' AND val = ?;", [WHATSAPP_ID], (err, row) => {
+      if (err) {
+        reject (err);
+      }
+      else {
+        resolve(row);
+      }
+    })
+  });
+  console.log('row.cid: ', row.cid);
+  const row2 = await new Promise((resolve, reject) => {
+    db_main.get("SELECT val FROM contactattrs WHERE key = 'WHATSAPP_AVATAR' AND cid = ?;", [row.cid], (err, row) => {
+      if (err) {
+        reject (err);
+      }
+      else {
+        resolve(row);
+      }
+    })
+  });
+
+  console.log('row2 val: ', row2.val);
+  await closeDatabase(db_main);
+
+  return row2.val;
+}
+
 module.exports.getMessageIRT = getMessageIRT;
 module.exports.add_message_txn = add_message_txn;
 module.exports.msgIRT_txn = msgIRT_txn;
@@ -344,3 +467,5 @@ module.exports.createContent_txn = createContent_txn;
 module.exports.UpdateContents = UpdateContents;
 module.exports.getContentID = getContentID;
 module.exports.ContactINFO_txn = ContactINFO_txn;
+module.exports.contentsAll_txn = contentsAll_txn;
+module.exports.getContactAttrs = getContactAttrs;

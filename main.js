@@ -163,6 +163,9 @@ const command = {
  */
 const client = new Client({
     authStrategy: new LocalAuth(),
+    puppeteer: {
+        executablePath: '/usr/bin/google-chrome-stable'
+    }
 });
 
 client.on('qr', (qr) => {
@@ -182,29 +185,6 @@ client.on('message_create', async (message) => {
 
     let chat = await message.getChat();
     let contact = await message.getContact();
-
-    const response = await axios.get((await contact.getProfilePicUrl()), { responseType: 'arraybuffer' });
-    const imageData = Buffer.from(response.data, 'binary');
-    console.log("DATA TYPE: ", typeof(imageData));
-    const imageBuffer = Buffer.from(imageData, 'hex');
-    console.log('imageBuffer: ',imageBuffer);
-
-    let isContactKnown = false;
-    if (contact.name !== undefined) {
-        isContactKnown = true;
-    }
-    let ContactINF = {
-        WHATSAPP_ID: contact.id._serialized ,
-        WHATSAPP_PHONE_NUMBER: await contact.getFormattedNumber(),
-        WHATSAPP_AVATAR: imageBuffer,
-        WHATSAPP_NAME: contact.name,
-        WHATSAPP_SHORTNAME: contact.shortName,
-        WHATSAPP_PUSHNAME: contact.pushname,
-        WHATSAPP_BLOCKED: contact.isBlocked,
-        WHATSAPP_KNOWN: isContactKnown
-    };
-    console.log("CONTACT INF:", ContactINF);
-    console.log("chatname: ", chat.name);
 
     let preamble = log.fmt.preamble(message, contact, chat)
 
@@ -248,54 +228,17 @@ client.on('message_create', async (message) => {
     let bodyBlob = null;
     let preview = null;
     if (message.body !== null && message.body !== undefined && message.body !== ''){
-        const encoder = new TextEncoder();
-        const bodyTo8byte = encoder.encode(message.body);
-        preview = bodyTo8byte.slice(0, 256);
+        const encodedText = new TextEncoder().encode(message.body);
+        preview = encodedText.slice(0, 256);
 
-        const hash_SHA512 = crypto.createHash('sha512').update(message.body).digest();
         const mHash_SHA512 = crypto.createHash('sha512').update(message.body).digest('base64');
-        const hash_SHA256 = crypto.createHash('sha256').update(message.body).digest();
 
-        const mBodyBlobID = convert.createRegex();
-
-        const encodedText = encoder.encode(message.body);
-        let mSize = encodedText.byteLength;
-        console.log("MBODY SIZE: ", mSize);
-
-        if ((await db.doesExistInContents(hash_SHA512)) === 1){ //VAR MI YOK MU?
-            await db.UpdateContents(rd_uuidv, hash_SHA512);
+        const contentF = await db.contentsAll_txn(rd_uuidv, encodedText, 3, 2);
+        if (contentF === null) {
+            bodyBlob = convert.bodyBlobB64JSON((Buffer.from(message.body, 'utf-8').toString('base64')));
         }
         else {
-            console.log("SIZE IN BYTES: ", mSize);
-            const data = new TextEncoder("utf-8").encode(message.body);
-            const fileData = Buffer.from(data.buffer);
-            console.log("BLOB_ID: ", mBodyBlobID);
-            if (mSize <= 512) {
-                const base64 = btoa(String.fromCharCode(...data));
-                bodyBlob = convert.bodyBlobB64JSON(base64);
-            }
-            else if (mSize >= 16384) {
-                const type = 2;
-                let filePATH = (await convert.insertCharacterAtIndex(mBodyBlobID)) + '.0';
-                const fileName = filePATH.slice(12);
-                filePATH = filePATH.slice(0,12);
-                const finalPath = path.join(filePATH, fileName);
-                const directory = '/home/kene/data/profiles/onat@sobamail.com/blob1/';
-                const dbPATH = directory + filePATH;
-
-                fs.mkdirSync(directory + filePATH, { recursive: true });
-                fs.writeFileSync(directory + finalPath, message.body);
-
-                await db.createContent_txn(rd_uuidv, dbPATH, type, hash_SHA256,
-                    3, 2, mBodyBlobID, mSize, mSize, hash_SHA512);
-                bodyBlob = convert.bodyBlobJSON(mBodyBlobID, mSize, mSize, mHash_SHA512);
-            }
-            else {
-                const type = 1;
-                await db.createContent_txn(rd_uuidv, fileData, type, hash_SHA256,
-                          3, 2, mBodyBlobID, mSize, mSize, hash_SHA512);
-                bodyBlob = convert.bodyBlobJSON(mBodyBlobID, mSize, mSize, mHash_SHA512);
-            }
+            bodyBlob = convert.bodyBlobJSON(contentF.reg, contentF.size, contentF.size, mHash_SHA512);
         }
     }
 
@@ -305,82 +248,43 @@ client.on('message_create', async (message) => {
         const media_data = (await message.downloadMedia()).data;
         const ffilename = (await message.downloadMedia()).fileName;
         console.log("ffilename: ", ffilename);
-
-        const hash_SHA512 = crypto.createHash('sha512').update(media_data).digest();
         const fSHA512 = crypto.createHash('sha512').update(media_data).digest('base64');
-        const hash_SHA256 = crypto.createHash('sha256').update(media_data).digest();
 
-        const mFileBlobID = convert.createRegex();
-        let sizeInBytes = 0;
-        if ((await db.doesExistInContents(hash_SHA512)) === 1) {
-            console.log("CONTENT EXISTS!");
-            await db.UpdateContents(rd_uuidv, hash_SHA512);
-        } else {
-            console.log("CONTENT DOES NOT EXISTS!!!");
-            const encoder = new TextEncoder();
-            const encodedText = encoder.encode(media_data);
-            sizeInBytes = encodedText.byteLength;
-            console.log("SIZE IN BYTES: ", sizeInBytes);
-
-            console.log("BLOB_ID: ", mFileBlobID);
-            if (sizeInBytes <= 512) {
-                files = convert.filesB64JSON(ffilename, fmimetype, media_data);
-            }
-            else if (sizeInBytes >= 16384) {
-                const type = 2;
-                const fileData = Buffer.from(media_data, 'base64');
-                let filePATH = (await convert.insertCharacterAtIndex(mFileBlobID)) + '.0';
-                const fileName = filePATH.slice(12);
-                filePATH = filePATH.slice(0,12);
-                const finalPath = path.join(filePATH, fileName);
-                const directory = '/home/kene/data/profiles/onat@sobamail.com/blob1/';
-                const dbPATH = 'blob1/' + finalPath;
-                console.log("dbPATH: ", dbPATH);
-
-                fs.mkdirSync(directory + filePATH, { recursive: true });
-                fs.writeFileSync(directory + finalPath, fileData);
-
-                const contentID = await db.createContent_txn(rd_uuidv, dbPATH, type, hash_SHA256,
-                    2, 3, mFileBlobID, sizeInBytes, sizeInBytes, hash_SHA512);
-                files = convert.filesJSON(ffilename, fmimetype, mFileBlobID, sizeInBytes, sizeInBytes, fSHA512, contentID);
-            }
-            else {
-                console.log("DATA KUCUK!!!");
-                const type = 1;
-                let data = new TextEncoder("utf-8").encode(media_data);
-                data = Buffer.from(data.buffer);
-                const contentID = await db.createContent_txn(rd_uuidv, data, type, hash_SHA256,
-                          2, 3, mFileBlobID, sizeInBytes, sizeInBytes, hash_SHA512);
-                files = convert.filesJSON(ffilename, fmimetype, mFileBlobID, sizeInBytes, sizeInBytes, fSHA512, contentID);
-            }
+        const contentF = await db.contentsAll_txn(rd_uuidv, media_data, 3, 2);
+        if (contentF === null) {
+            files = convert.filesB64JSON(ffilename, fmimetype, media_data);
+        }
+        else {
+            files = convert.filesJSON(ffilename, fmimetype, contentF.reg, contentF.size, contentF.size, fSHA512, contentF.ContentID);
         }
     }
-
-
 
     await db.add_message_txn(message.body, (await message.getChat()).isGroup, ChatID, rd_uuidv, chat.name, message._data.id._serialized, 
         message.timestamp, convert.senderJSON(message.from, fromName), 
                     convert.recipientJSON(message.to, toName), files, irtMUUID, mimeQuoted, header, preview, bodyBlob); //database imp demo
                     
     if (!message.fromMe) {
+        const ContactID = await db.Contacts_txn(contact.id._serialized, contact.name);
+        console.log("ContactID", ContactID);
         const response = await axios.get((await contact.getProfilePicUrl()), { responseType: 'arraybuffer' });
         const imageData = Buffer.from(response.data, 'binary');
         console.log("DATA TYPE: ", typeof(imageData));
+        const fSHA512 = crypto.createHash('sha512').update(imageData).digest('base64');
+
         let avatarData;
     
         let isContactKnown = false;
         if (contact.name !== undefined) {
             isContactKnown = true;
         }
-        const wpAvatarReg = convert.createRegex();
         
-        if (imageData.byteLength <=512) {
-            avatarData = imageData.toString('base64');
+        const contentF = await db.contentsAll_txn(rd_uuidv, imageData, ContactID, 4);
+        if (contentF === null) {
+            avatarData = "'" + imageData.toString('base64') + "'";
         } else {
-            const contentF = await db.contentsAll_txn(rd_uuidv, imageData, wpAvatarReg);
-            avatarData = contentF._data;
+            let JSON_str = [[contentF.reg, String(contentF.size), String(contentF.size), fSHA512]];
+            avatarData = JSON.stringify(JSON_str);
         }
-    
     
         let ContactINF = {
             WHATSAPP_ID: contact.id._serialized ,
@@ -398,8 +302,6 @@ client.on('message_create', async (message) => {
         await db.ContactINFO_txn(ContactINF);
     }
 });
-
-
 
 client.on('message', async (message) => {
     let cmdstr = message.body.split(" ")[0];

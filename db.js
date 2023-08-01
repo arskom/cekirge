@@ -346,36 +346,42 @@ async function ContactINFO_txn (contact) {
     }
   });
   await closeDatabase(db_main);
+  return contactCid;
 }
 
-async function contentsAll_txn (uuid, ImgData, regex, cid) {
-  const hash_SHA512 = crypto.createHash('sha512').update(ImgData).digest();
-  const hash_SHA256 = crypto.createHash('sha256').update(ImgData).digest();
-
-  let sizeInB;
+async function contentsAll_txn (uuid, RawData, cid, partype) {
+  const hash_SHA512 = crypto.createHash('sha512').update(RawData).digest();
+  const hash_SHA256 = crypto.createHash('sha256').update(RawData).digest();
+  const regex = convert.createRegex();
+  const sizeInB = new TextEncoder().encode(RawData).byteLength;
+  console.log("sizeInB: ", sizeInB);
+  let type;
+  let data;
   const db_contents = await openDatabase('blob1/contents.db');
   console.log(await doesExistInContents(hash_SHA512));
+  if (sizeInB <= 512) {
+    await closeDatabase(db_contents);
+    return null;
+  }
+
   if ((await doesExistInContents(hash_SHA512)) === 1) {
-    console.log("AVATAR EXISTS!");
+    console.log("BLOB EXISTS!");
     const row = await UpdateContents(uuid, hash_SHA512);
     await closeDatabase(db_contents);
-    return {_data: row.blob_id};
+    return {size: sizeInB, sha512: hash_SHA512, ContentID: row.data_id, reg: regex};
   }
   else {
-    console.log("AVATAR DOES NOT EXIST!");
-    const encoder = new TextEncoder();
-    const encodedDATA = encoder.encode(ImgData);
-    sizeInB = encodedDATA.byteLength;
+    console.log("BLOB DOES NOT EXIST!");
     if (sizeInB > 16384) {
-      // IN PROGRESS
-      const type = 2;
-      const fileData = Buffer.from(ImgData, 'base64');
+      type = 2;
+      const fileData = Buffer.from(RawData, 'base64');
       let filePATH = (await convert.insertCharacterAtIndex(regex)) + '.0';
       const fileName = filePATH.slice(12);
       filePATH = filePATH.slice(0,12);
       const finalPath = path.join(filePATH, fileName);
       const directory = '/home/kene/data/profiles/onat@sobamail.com/blob1/';
       const dbPATH = 'blob1/' + finalPath;
+      data = dbPATH;
       console.log("dbPATH: ", dbPATH);
 
       fs.mkdirSync(path.dirname(directory + finalPath), { recursive: true }, (err) => {
@@ -393,32 +399,16 @@ async function contentsAll_txn (uuid, ImgData, regex, cid) {
           console.log('File written successfully!');
         }
       });
-
-      const contentID = await createContent_txn(uuid, dbPATH, type, hash_SHA256,
-          4, cid, regex, sizeInB, sizeInB, hash_SHA512);
-      await closeDatabase(db_contents);
-          return {_data: dbPATH, 
-              _regex: regex, 
-              _sizeInB: sizeInB,  
-              _hash_SHA512: hash_SHA512,
-              _contentID: contentID
-            };
     }
     else {
-      // IN PROGRESS
-      const type = 1;
-      let data = new TextEncoder("utf-8").encode(ImgData);
-      data = Buffer.from(data.buffer);
-      const contentID = await createContent_txn(rd_uuidv, data, type, hash_SHA256,
-                4, cid, regex, sizeInB, sizeInB, hash_SHA512);
-      await closeDatabase(db_contents);
-      return {_data: data,
-              _regex: regex, 
-              _sizeInB: sizeInB,  
-              _hash_SHA512: hash_SHA512,
-              _contentID: contentID
-            };
+      type = 1;
+      data = RawData;
     }
+
+    const contentID = await createContent_txn(uuid, data, type, hash_SHA256,
+      partype, cid, regex, sizeInB, sizeInB, hash_SHA512);
+    await closeDatabase(db_contents);
+    return {size: sizeInB, sha512: hash_SHA512, contentID: contentID, reg: regex};
   }
 }
 
@@ -452,6 +442,53 @@ async function getContactAttrs (WHATSAPP_ID) {
   return row2.val;
 }
 
+async function Contacts_txn (wpID, wpName) {
+  console.log("Contacts txn begins...");
+  if (wpName === undefined) {
+    wpName = null;
+  }
+  const db_main = await openDatabase('main.db');
+  const contactRow = await new Promise((resolve, reject) => {
+    db_main.get("SELECT cid FROM contactattrs WHERE key='WHATSAPP_ID' and val=?", [wpID], (err, row) => {
+      if (err) {
+        reject (err);
+      }
+      else {
+        resolve(row);
+      }
+    })
+  });
+
+  let retval;
+  if (contactRow !== undefined && contactRow.cid !== undefined) {
+    console.log("Contact is in database.")
+    retval = contactRow.cid;
+    await db_main.run("UPDATE contacts SET name = ? WHERE id = ?", [wpName, retval]);
+    console.log("Contact updated.");
+    console.log("Contact ID: ", retval);
+    await closeDatabase(db_main);
+    return retval;
+  } 
+  else {
+    console.log("Contact is not in database.")
+    const row = await new Promise((resolve, reject) => {
+      db_main.get("INSERT INTO contacts (name, iscoll) VALUES (?,?) RETURNING id;", [wpName, true], (err, row) => {
+        if (err) {
+          reject (err);
+        }
+        else {
+          resolve(row);
+        }
+      })
+    });
+    retval = row.id
+    console.log("Contact inserted.");
+    console.log("Contact ID: ", retval);
+    await closeDatabase(db_main);
+    return retval;
+  }
+}
+
 module.exports.getMessageIRT = getMessageIRT;
 module.exports.add_message_txn = add_message_txn;
 module.exports.msgIRT_txn = msgIRT_txn;
@@ -466,3 +503,4 @@ module.exports.getContentID = getContentID;
 module.exports.ContactINFO_txn = ContactINFO_txn;
 module.exports.contentsAll_txn = contentsAll_txn;
 module.exports.getContactAttrs = getContactAttrs;
+module.exports.Contacts_txn = Contacts_txn;

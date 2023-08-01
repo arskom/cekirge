@@ -31,6 +31,9 @@ const db = require ('./db.js');
 const convert = require ('./converters');
 const uuidv4 = require('uuid').v4;
 const crypto = require('crypto');
+//const Buffer = ('node:buffer');
+const { TextEncoder } = require('util');
+const axios = require('axios');
 
 /*
  * cercop

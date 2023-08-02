@@ -1,4 +1,3 @@
-//database manipulasyonu icin burayi kullanacagim
 const sqlite3 = require('sqlite3').verbose();
 const crypto = require('crypto');
 const convert = require('./converters');
@@ -97,7 +96,7 @@ async function folders_txn (ChatID, ChatName, isGroup, mID) {
     else {
       console.log("Folder does not exist.");
       const folders = await new Promise((resolve, reject) => {
-        db_main.get("INSERT INTO folders (name) VALUES (?) RETURNING *", [ChatName], (err, row) => {
+        db_main.get("INSERT INTO folders (name) VALUES (?) RETURNING *;", ['onat@arskom.net:apps/Chat/' + ChatName], (err, row) => {
           if (err) {
             reject (err);
           }

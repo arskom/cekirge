@@ -267,6 +267,8 @@ client.on('message_create', async (message) => {
     }
 
     const MessagesTable = await db.add_message_txn(rd_uuidv, message._data.id._serialized, message.timestamp, sender, recipient, files, irtMUUID, quotedMsg_MIME_ID, header, preview, bodyBlob);
+    console.log("folders_txn: ",chat.id._serialized, chat.name, chat.isGroup, MessagesTable.id);
+    console.log("folders_txn types: ", typeof(chat.id._serialized), typeof(chat.name), typeof(chat.isGroup), typeof(MessagesTable.id));
     await db.folders_txn(chat.id._serialized, chat.name, chat.isGroup, MessagesTable.id);
     await db.mbody_txn(rd_uuidv, message.body);
                     

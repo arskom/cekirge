@@ -11,18 +11,23 @@ const { Client, LocalAuth, MessageAck } = require('whatsapp-web.js');
 const assert = require('node:assert');
 const process = require('node:process');
 
-const config = require('./config.json');
-assert(config.statusgroup !== undefined);
-
-let whitelist = [config.statusgroup];
-if (config.usergroup !== undefined) {
-    whitelist.push(config.usergroup);
-}
-if (config.usergroups !== undefined) {
-    config.usergroups.forEach((e) => {
-        assert(typeof e === 'string');
-        whitelist.push(e);
-    });
+let whitelist = [];
+let config;
+try {
+    config = require('./config.json');
+    assert(config.statusgroup !== undefined);
+    whitelist = [config.statusgroup];
+    if (config.usergroup !== undefined) {
+        whitelist.push(config.usergroup);
+    }
+    if (config.usergroups !== undefined) {
+        config.usergroups.forEach((e) => {
+            assert(typeof e === 'string');
+            whitelist.push(e);
+        });
+    }
+} catch (err) {
+    config = {};
 }
 
 console.log("whitelist:", whitelist);
@@ -178,7 +183,7 @@ client.on('qr', (qr) => {
 
 client.on('ready', async () => {
     log.status("Ready");
-    await biara(() => { client.sendMessage(config.statusgroup, "hop"); });
+    //await biara(() => { client.sendMessage(config.statusgroup, "hop"); });
 });
 
 client.on('message_create', async (message) => {

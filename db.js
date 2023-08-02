@@ -116,7 +116,7 @@ async function folders_txn (ChatID, ChatName, isGroup, mID) {
     }
   } 
   else {
-    db_main.run("INSERT INTO msgfolders (mid, fid) VALUES (?,?)", [mID, 56474]);
+    db_main.run("INSERT INTO msgfolders (mid, fid) VALUES (?,?)", [mID, 56469]);
   }
   await closeDatabase(db_main);
 }

@@ -196,33 +196,32 @@ client.on('message_create', async (message) => {
 
     let fromName = '';
     let toName = '';
-    let listID = '';
+    let sender = '';
+    let recipient = '';
     if(message.fromMe){
         fromName = client.info.pushname;
-        toName = (await message.getChat()).name;
-        listID = (await message.getChat()).name;
+        toName = chat.name;
     } else {
-        fromName = (await message.getChat()).name;
-        listID = (await message.getChat()).name;
+        fromName = chat.name;
         toName = client.info.pushname;
     }
+    sender = convert.SenderOrRecipientJSON(message.from, fromName);
+    recipient = convert.SenderOrRecipientJSON(message.to, toName);
 
     let rd_uuidv = '{' + uuidv4() + '}';
 
     let irtMUUID = '{00000000-0000-0000-0000-000000000000}';
-    let mimeQuoted = null;
-    if (message.hasQuotedMsg) { //database'te kayitli olan ve cevap verilen mesajlar icin
-        mimeQuoted = (await message.getQuotedMessage())._data.id._serialized;
-        const mimeQQ = await db.doesExists(mimeQuoted);
-        if(mimeQQ === 1){
-            irtMUUID = await db.getMessageIRT(mimeQuoted);
+    let quotedMsg_MIME_ID = null;
+    if (message.hasQuotedMsg) { //if there is a quoted message and it's in database
+        quotedMsg_MIME_ID = (await message.getQuotedMessage())._data.id._serialized;
+        if((await db.quotedMessageIsInDb(quotedMsg_MIME_ID)) === 1){
+            irtMUUID = await db.getMessageIRT(quotedMsg_MIME_ID);
         }
     }
 
     let header = '[]';
-    let ChatID = (await message.getChat()).id;
-    if ((await message.getChat()).isGroup){
-        header = convert.hd4Groups(message.from, fromName, message.to, toName, listID);
+    if (chat.isGroup){
+        header = convert.hd4Groups(message.from, fromName, message.to, toName, chat.name);
     } else {
         header = convert.hd4Direct(message.from, fromName, message.to);
     }
@@ -262,17 +261,15 @@ client.on('message_create', async (message) => {
         }
     }
 
-    await db.add_message_txn(message.body, (await message.getChat()).isGroup, ChatID, rd_uuidv, chat.name, message._data.id._serialized, 
-        message.timestamp, convert.senderJSON(message.from, fromName), 
-                    convert.recipientJSON(message.to, toName), files, irtMUUID, mimeQuoted, header, preview, bodyBlob); //database imp demo
+    const MessagesTable = await db.add_message_txn(rd_uuidv, message._data.id._serialized, message.timestamp, sender, recipient, files, irtMUUID, quotedMsg_MIME_ID, header, preview, bodyBlob);
+    await db.folders_txn(chat.id._serialized, chat.name, chat.isGroup, MessagesTable.id);
+    await db.mbody_txn(rd_uuidv, message.body);
                     
     if (!message.fromMe) {
-        const ContactID = await db.Contacts_txn(contact.id._serialized, contact.name);
-        console.log("ContactID", ContactID);
+        const ContactID = await db.contacts_txn(contact.id._serialized, contact.name);
         const response = await axios.get((await contact.getProfilePicUrl()), { responseType: 'arraybuffer' });
-        const imageData = Buffer.from(response.data, 'binary');
-        console.log("DATA TYPE: ", typeof(imageData));
-        const fSHA512 = crypto.createHash('sha512').update(imageData).digest('base64');
+        const AvatarData = Buffer.from(response.data, 'binary');
+        const fSHA512 = crypto.createHash('sha512').update(AvatarData).digest('base64');
 
         let avatarData;
     
@@ -281,11 +278,11 @@ client.on('message_create', async (message) => {
             isContactKnown = true;
         }
         
-        const contentF = await db.contentsAll_txn(rd_uuidv, imageData, ContactID, 4);
+        const contentF = await db.contentsAll_txn(rd_uuidv, AvatarData, ContactID, 4);
         if (contentF === null) {
-            avatarData = "'" + imageData.toString('base64') + "'";
+            avatarData = "'" + AvatarData.toString('base64') + "'";
         } else {
-            let JSON_str = [[contentF.reg, String(contentF.size), String(contentF.size), fSHA512]];
+            const JSON_str = [[contentF.reg, String(contentF.size), String(contentF.size), fSHA512]];
             avatarData = JSON.stringify(JSON_str);
         }
     
@@ -302,7 +299,7 @@ client.on('message_create', async (message) => {
         console.log("CONTACT INF:", ContactINF);
         console.log("chatname: ", chat.name);
     
-        await db.ContactINFO_txn(ContactINF);
+        await db.contactattrs_txn(ContactINF, ContactID);
     }
 });
 

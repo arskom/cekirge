@@ -8,12 +8,7 @@ function hd4Direct (from, fromName, to) {
     return JSON.stringify(hd);
 }
 
-function senderJSON (senderID, senderName) {
-    const retval = [[senderName, senderID]];
-    return JSON.stringify(retval);
-}
-
-function recipientJSON (rcpID, rcpName) {
+function SenderOrRecipientJSON (rcpID, rcpName) {
     const retval = [[rcpName, rcpID]];
     return JSON.stringify(retval);
 }
@@ -95,8 +90,7 @@ function fileType (str) {
 
 module.exports.hd4Groups = hd4Groups;
 module.exports.hd4Direct = hd4Direct;
-module.exports.senderJSON = senderJSON;
-module.exports.recipientJSON = recipientJSON;
+module.exports.SenderOrRecipientJSON = SenderOrRecipientJSON;
 module.exports.bodyBlobJSON = bodyBlobJSON;
 module.exports.convertToBase64 = convertToBase64;
 module.exports.insertCharacterAtIndex = insertCharacterAtIndex;

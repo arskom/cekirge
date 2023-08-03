@@ -191,6 +191,10 @@ client.on('message_create', async (message) => {
         return;
     }
 
+    if (message.type === 'e2e_notification'){
+        return;
+    }
+
     let chat = await message.getChat();
     let contact = await message.getContact();
 
@@ -214,6 +218,7 @@ client.on('message_create', async (message) => {
     recipient = convert.SenderOrRecipientJSON(message.to, toName);
 
     let rd_uuidv = '{' + uuidv4() + '}';
+    const folderUUID = '{' + uuidv4() + '}';
 
     let irtMUUID = '{00000000-0000-0000-0000-000000000000}';
     let quotedMsg_MIME_ID = null;
@@ -267,9 +272,7 @@ client.on('message_create', async (message) => {
     }
 
     const MessagesTable = await db.add_message_txn(rd_uuidv, message._data.id._serialized, message.timestamp, sender, recipient, files, irtMUUID, quotedMsg_MIME_ID, header, preview, bodyBlob);
-    console.log("folders_txn: ",chat.id._serialized, chat.name, chat.isGroup, MessagesTable.id);
-    console.log("folders_txn types: ", typeof(chat.id._serialized), typeof(chat.name), typeof(chat.isGroup), typeof(MessagesTable.id));
-    await db.folders_txn(chat.id._serialized, chat.name, chat.isGroup, MessagesTable.id);
+    await db.folders_txn(chat.id._serialized, chat.name, chat.isGroup, MessagesTable.id, folderUUID);
     await db.mbody_txn(rd_uuidv, message.body);
                     
     if (!message.fromMe) {

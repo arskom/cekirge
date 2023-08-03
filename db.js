@@ -61,7 +61,7 @@ async function add_message_txn (uuid, mimeID, timestamp, sender, recipient, file
   }
 }
 
-async function folders_txn (ChatID, ChatName, isGroup, mID) {
+async function folders_txn (ChatID, ChatName, isGroup, mID, uuid) {
   const db_main = await openDatabase('main.db');
 
   if (isGroup) {
@@ -96,7 +96,7 @@ async function folders_txn (ChatID, ChatName, isGroup, mID) {
     else {
       console.log("Folder does not exist.");
       const folders = await new Promise((resolve, reject) => {
-        db_main.get("INSERT INTO folders (name) VALUES (?) RETURNING *;", ['onat@arskom.net:apps/Chat/' + ChatName], (err, row) => {
+        db_main.get("INSERT INTO folders (name, uuid) VALUES (?,?) RETURNING *;", ['onat@arskom.net:apps/Chat/' + ChatName, uuid], (err, row) => {
           if (err) {
             reject (err);
           }
@@ -115,7 +115,7 @@ async function folders_txn (ChatID, ChatName, isGroup, mID) {
     }
   } 
   else {
-    db_main.run("INSERT INTO msgfolders (mid, fid) VALUES (?,?)", [mID, 56469]);
+    db_main.run("INSERT INTO msgfolders (mid, fid) VALUES (?,?)", [mID, 8]);
   }
   await closeDatabase(db_main);
 }

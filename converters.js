@@ -8,12 +8,7 @@ function hd4Direct (from, fromName, to) {
     return JSON.stringify(hd);
 }
 
-function senderJSON (senderID, senderName) {
-    const retval = [[senderName, senderID]];
-    return JSON.stringify(retval);
-}
-
-function recipientJSON (rcpID, rcpName) {
+function SenderOrRecipientJSON (rcpID, rcpName) {
     const retval = [[rcpName, rcpID]];
     return JSON.stringify(retval);
 }
@@ -31,7 +26,6 @@ function bodyBlobB64JSON (bodyBase64) {
 function filesJSON (fileName, mimeType, blobID, size, csize, sha512, contentID) {
     let retval;
     const ext =  '.' + fileType(mimeType);
-    console.log("extension: ", ext);
     if (fileName === null || fileName === undefined || fileName === "") {
         retval = [["Unnamed Attachment"+ext, mimeType, [blobID, String(size), String(csize), String(sha512)], String(contentID),""]];
     } else {
@@ -43,7 +37,6 @@ function filesJSON (fileName, mimeType, blobID, size, csize, sha512, contentID) 
 function filesB64JSON (fileName, mimeType, data) {
     let retval;
     const ext =  '.' + fileType(mimeType);
-    console.log("extension: ", ext);
     if (fileName === null || fileName === undefined || fileName === "") {
         retval = [["Unnamed Attachment" + ext, String(mimeType), [String(data)], "", ""]];
     }
@@ -62,7 +55,6 @@ function insertCharacterAtIndex(text) {
     text = text.substring(0, 9) + '/' + text.substring(9);
     text = text.substring(0, 6) + '/' + text.substring(6);
     text = text.substring(0, 3) + '/' + text.substring(3);
-    console.log("PATH : " , text);
     return text;
 }
 
@@ -95,8 +87,7 @@ function fileType (str) {
 
 module.exports.hd4Groups = hd4Groups;
 module.exports.hd4Direct = hd4Direct;
-module.exports.senderJSON = senderJSON;
-module.exports.recipientJSON = recipientJSON;
+module.exports.SenderOrRecipientJSON = SenderOrRecipientJSON;
 module.exports.bodyBlobJSON = bodyBlobJSON;
 module.exports.convertToBase64 = convertToBase64;
 module.exports.insertCharacterAtIndex = insertCharacterAtIndex;

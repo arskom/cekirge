@@ -11,18 +11,23 @@ const { Client, LocalAuth, MessageAck } = require('whatsapp-web.js');
 const assert = require('node:assert');
 const process = require('node:process');
 
-const config = require('./config.json');
-assert(config.statusgroup !== undefined);
-
-let whitelist = [config.statusgroup];
-if (config.usergroup !== undefined) {
-    whitelist.push(config.usergroup);
-}
-if (config.usergroups !== undefined) {
-    config.usergroups.forEach((e) => {
-        assert(typeof e === 'string');
-        whitelist.push(e);
-    });
+let whitelist = [];
+let config;
+try {
+    config = require('./config.json');
+    assert(config.statusgroup !== undefined);
+    whitelist = [config.statusgroup];
+    if (config.usergroup !== undefined) {
+        whitelist.push(config.usergroup);
+    }
+    if (config.usergroups !== undefined) {
+        config.usergroups.forEach((e) => {
+            assert(typeof e === 'string');
+            whitelist.push(e);
+        });
+    }
+} catch (err) {
+    config = {};
 }
 
 console.log("whitelist:", whitelist);
@@ -31,6 +36,9 @@ const db = require ('./db.js');
 const convert = require ('./converters');
 const uuidv4 = require('uuid').v4;
 const crypto = require('crypto');
+const { TextEncoder } = require('util');
+const axios = require('axios');
+const { unescape } = require('node:querystring');
 
 /*
  * cercop
@@ -163,6 +171,9 @@ const command = {
  */
 const client = new Client({
     authStrategy: new LocalAuth(),
+    puppeteer: {
+        executablePath: '/usr/bin/google-chrome-stable'
+    }
 });
 
 client.on('qr', (qr) => {
@@ -172,7 +183,7 @@ client.on('qr', (qr) => {
 
 client.on('ready', async () => {
     log.status("Ready");
-    await biara(() => { client.sendMessage(config.statusgroup, "hop"); });
+    //await biara(() => { client.sendMessage(config.statusgroup, "hop"); });
 });
 
 client.on('message_create', async (message) => {
@@ -180,122 +191,77 @@ client.on('message_create', async (message) => {
         return;
     }
 
+    if (message.type === 'e2e_notification'){
+        return;
+    }
+
+    let ClientPushname;
+    if (client.info.pushname === null && client.info.pushname === undefined) {
+        ClientPushname = '';
+    } else {
+        ClientPushname = client.info.pushname;
+    }
     let chat = await message.getChat();
     let contact = await message.getContact();
-
-    const response = await axios.get((await contact.getProfilePicUrl()), { responseType: 'arraybuffer' });
-    const imageData = Buffer.from(response.data, 'binary');
-    console.log("DATA TYPE: ", typeof(imageData));
-    const imageBuffer = Buffer.from(imageData, 'hex');
-    console.log('imageBuffer: ',imageBuffer);
-
-    let isContactKnown = false;
-    if (contact.name !== undefined) {
-        isContactKnown = true;
-    }
-    let ContactINF = {
-        WHATSAPP_ID: contact.id._serialized ,
-        WHATSAPP_PHONE_NUMBER: await contact.getFormattedNumber(),
-        WHATSAPP_AVATAR: imageBuffer,
-        WHATSAPP_NAME: contact.name,
-        WHATSAPP_SHORTNAME: contact.shortName,
-        WHATSAPP_PUSHNAME: contact.pushname,
-        WHATSAPP_BLOCKED: contact.isBlocked,
-        WHATSAPP_KNOWN: isContactKnown
-    };
-    console.log("CONTACT INF:", ContactINF);
-    console.log("chatname: ", chat.name);
 
     let preamble = log.fmt.preamble(message, contact, chat)
 
     log.debug(message);
     log.message(preamble, message.body); 
 
-    let fromName = '';
-    let toName = '';
-    let listID = '';
-    if(message.fromMe){
-        fromName = client.info.pushname;
-        toName = (await message.getChat()).name;
-        listID = (await message.getChat()).name;
-    } else {
-        fromName = (await message.getChat()).name;
-        listID = (await message.getChat()).name;
-        toName = client.info.pushname;
-    }
-
     let rd_uuidv = '{' + uuidv4() + '}';
+    const folderUUID = '{' + uuidv4() + '}';
+    console.log("Message UUID: ", rd_uuidv);
+    console.log("Folder UUID: ", folderUUID);
 
     let irtMUUID = '{00000000-0000-0000-0000-000000000000}';
-    let mimeQuoted = null;
-    if (message.hasQuotedMsg) { //database'te kayitli olan ve cevap verilen mesajlar icin
-        mimeQuoted = (await message.getQuotedMessage())._data.id._serialized;
-        const mimeQQ = await db.doesExists(mimeQuoted);
-        if(mimeQQ === 1){
-            irtMUUID = await db.getMessageIRT(mimeQuoted);
+    let quotedMsg_MIME_ID = null;
+    if (message.hasQuotedMsg) { //if there is a quoted message and it's in database
+        quotedMsg_MIME_ID = (await message.getQuotedMessage())._data.id._serialized;
+        if((await db.quotedMessageIsInDb(quotedMsg_MIME_ID)) === 1){
+            irtMUUID = await db.getMessageIRT(quotedMsg_MIME_ID);
         }
     }
 
     let header = '[]';
-    let ChatID = (await message.getChat()).id;
-    if ((await message.getChat()).isGroup){
-        header = convert.hd4Groups(message.from, fromName, message.to, toName, listID);
+    let fromName = '';
+    let toName = '';
+    let sender = '';
+    let recipient = '';
+    if (chat.isGroup){
+        if(message.fromMe){
+            header = convert.hd4Groups(message.from, client.pushname, chat.id._serialized, chat.name, chat.name);   
+        } else {
+            header = convert.hd4Groups((await message.getContact()).id._serialized, message.author, chat.id._serialized, chat.name, chat.name);    
+        }
     } else {
+        if(message.fromMe){
+            fromName = ClientPushname;
+            toName = chat.name;
+        } else {
+            fromName = chat.name;
+            toName = ClientPushname;
+        }
         header = convert.hd4Direct(message.from, fromName, message.to);
     }
+    sender = convert.SenderOrRecipientJSON(message.from, fromName);
+    recipient = convert.SenderOrRecipientJSON(message.to, toName);
     
     // If message is not empty, do fill body_blob and preview columns in database
     let bodyBlob = null;
     let preview = null;
     if (message.body !== null && message.body !== undefined && message.body !== ''){
-        const encoder = new TextEncoder();
-        const bodyTo8byte = encoder.encode(message.body);
-        preview = bodyTo8byte.slice(0, 256);
+        const encodedText = new TextEncoder().encode(message.body);
+        preview = encodedText.slice(0, 256);
 
-        const hash_SHA512 = crypto.createHash('sha512').update(message.body).digest();
         const mHash_SHA512 = crypto.createHash('sha512').update(message.body).digest('base64');
-        const hash_SHA256 = crypto.createHash('sha256').update(message.body).digest();
 
-        const mBodyBlobID = convert.createRegex();
-
-        const encodedText = encoder.encode(message.body);
-        let mSize = encodedText.byteLength;
-        console.log("MBODY SIZE: ", mSize);
-
-        if ((await db.doesExistInContents(hash_SHA512)) === 1){ //VAR MI YOK MU?
-            await db.UpdateContents(rd_uuidv, hash_SHA512);
+        const contentF = await db.contentsAll_txn(rd_uuidv, encodedText, 3, 2);
+        if (contentF === null) {
+            bodyBlob = convert.bodyBlobB64JSON((Buffer.from(message.body, 'utf-8').toString('base64')));
         }
         else {
-            console.log("SIZE IN BYTES: ", mSize);
-            const data = new TextEncoder("utf-8").encode(message.body);
-            const fileData = Buffer.from(data.buffer);
-            console.log("BLOB_ID: ", mBodyBlobID);
-            if (mSize <= 512) {
-                const base64 = btoa(String.fromCharCode(...data));
-                bodyBlob = convert.bodyBlobB64JSON(base64);
-            }
-            else if (mSize >= 16384) {
-                const type = 2;
-                let filePATH = (await convert.insertCharacterAtIndex(mBodyBlobID)) + '.0';
-                const fileName = filePATH.slice(12);
-                filePATH = filePATH.slice(0,12);
-                const finalPath = path.join(filePATH, fileName);
-                const directory = '/home/kene/data/profiles/onat@sobamail.com/blob1/';
-                const dbPATH = directory + filePATH;
-
-                fs.mkdirSync(directory + filePATH, { recursive: true });
-                fs.writeFileSync(directory + finalPath, message.body);
-
-                await db.createContent_txn(rd_uuidv, dbPATH, type, hash_SHA256,
-                    3, 2, mBodyBlobID, mSize, mSize, hash_SHA512);
-                bodyBlob = convert.bodyBlobJSON(mBodyBlobID, mSize, mSize, mHash_SHA512);
-            }
-            else {
-                const type = 1;
-                await db.createContent_txn(rd_uuidv, fileData, type, hash_SHA256,
-                          3, 2, mBodyBlobID, mSize, mSize, hash_SHA512);
-                bodyBlob = convert.bodyBlobJSON(mBodyBlobID, mSize, mSize, mHash_SHA512);
-            }
+            bodyBlob = convert.bodyBlobJSON(contentF.reg, contentF.size, contentF.size, mHash_SHA512);
         }
     }
 
@@ -304,70 +270,58 @@ client.on('message_create', async (message) => {
         const fmimetype = (await message.downloadMedia()).mimetype;
         const media_data = (await message.downloadMedia()).data;
         const ffilename = (await message.downloadMedia()).fileName;
-        console.log("ffilename: ", ffilename);
-
-        const hash_SHA512 = crypto.createHash('sha512').update(media_data).digest();
         const fSHA512 = crypto.createHash('sha512').update(media_data).digest('base64');
-        const hash_SHA256 = crypto.createHash('sha256').update(media_data).digest();
 
-        const mFileBlobID = convert.createRegex();
-        let sizeInBytes = 0;
-        if ((await db.doesExistInContents(hash_SHA512)) === 1) {
-            console.log("CONTENT EXISTS!");
-            await db.UpdateContents(rd_uuidv, hash_SHA512);
-        } else {
-            console.log("CONTENT DOES NOT EXISTS!!!");
-            const encoder = new TextEncoder();
-            const encodedText = encoder.encode(media_data);
-            sizeInBytes = encodedText.byteLength;
-            console.log("SIZE IN BYTES: ", sizeInBytes);
-
-            console.log("BLOB_ID: ", mFileBlobID);
-            if (sizeInBytes <= 512) {
-                files = convert.filesB64JSON(ffilename, fmimetype, media_data);
-            }
-            else if (sizeInBytes >= 16384) {
-                const type = 2;
-                const fileData = Buffer.from(media_data, 'base64');
-                let filePATH = (await convert.insertCharacterAtIndex(mFileBlobID)) + '.0';
-                const fileName = filePATH.slice(12);
-                filePATH = filePATH.slice(0,12);
-                const finalPath = path.join(filePATH, fileName);
-                const directory = '/home/kene/data/profiles/onat@sobamail.com/blob1/';
-                const dbPATH = 'blob1/' + finalPath;
-                console.log("dbPATH: ", dbPATH);
-
-                fs.mkdirSync(directory + filePATH, { recursive: true });
-                fs.writeFileSync(directory + finalPath, fileData);
-
-                await db.createContent_txn(rd_uuidv, dbPATH, type, hash_SHA256,
-                    2, 3, mFileBlobID, sizeInBytes, sizeInBytes, hash_SHA512);
-            
-                const contentID = await db.getContentID(hash_SHA512);
-                files = convert.filesJSON(ffilename, fmimetype, mFileBlobID, sizeInBytes, sizeInBytes, fSHA512, contentID);
-            }
-            else {
-                console.log("DATA KUCUK!!!");
-                const type = 1;
-                let data = new TextEncoder("utf-8").encode(media_data);
-                data = Buffer.from(data.buffer);
-                await db.createContent_txn(rd_uuidv, data, type, hash_SHA256,
-                          2, 3, mFileBlobID, sizeInBytes, sizeInBytes, hash_SHA512);
-
-                const contentID = await db.getContentID(hash_SHA512);
-                files = convert.filesJSON(ffilename, fmimetype, mFileBlobID, sizeInBytes, sizeInBytes, fSHA512, contentID);
-            }
+        const contentF = await db.contentsAll_txn(rd_uuidv, media_data, 3, 2);
+        if (contentF === null) {
+            files = convert.filesB64JSON(ffilename, fmimetype, media_data);
+        }
+        else {
+            files = convert.filesJSON(ffilename, fmimetype, contentF.reg, contentF.size, contentF.size, fSHA512, contentF.ContentID);
         }
     }
 
-    await db.add_message_txn(message.body, (await message.getChat()).isGroup, ChatID, rd_uuidv, chat.name, message._data.id._serialized, 
-        message.timestamp, convert.senderJSON(message.from, fromName), 
-                    convert.recipientJSON(message.to, toName), files, irtMUUID, mimeQuoted, header, preview, bodyBlob); //database imp demo
+    const MessagesTable = await db.add_message_txn(rd_uuidv, message._data.id._serialized, message.timestamp, sender, recipient, files, irtMUUID, quotedMsg_MIME_ID, header, preview, bodyBlob);
+    await db.folders_txn(chat.id._serialized, chat.name, chat.isGroup, MessagesTable.id, folderUUID);
+    await db.mbody_txn(rd_uuidv, message.body);
+                    
     if (!message.fromMe) {
-        await db.ContactINFO_txn(ContactINF);
+        const ContactID = await db.contacts_txn(contact.id._serialized, contact.name);
+        const response = await axios.get((await contact.getProfilePicUrl()), { responseType: 'arraybuffer' });
+        const AvatarData = Buffer.from(response.data, 'binary');
+        const fSHA512 = crypto.createHash('sha512').update(AvatarData).digest('base64');
+
+        let avatarData;
+    
+        let isContactKnown = false;
+        if (contact.name !== undefined) {
+            isContactKnown = true;
+        }
+        
+        const contentF = await db.contentsAll_txn(rd_uuidv, AvatarData, ContactID, 4);
+        if (contentF === null) {
+            avatarData = "'" + AvatarData.toString('base64') + "'";
+        } else {
+            const JSON_str = [[contentF.reg, String(contentF.size), String(contentF.size), fSHA512]];
+            avatarData = JSON.stringify(JSON_str);
+        }
+    
+        let ContactINF = {
+            WHATSAPP_ID: contact.id._serialized ,
+            WHATSAPP_PHONE_NUMBER: await contact.getFormattedNumber(),
+            WHATSAPP_AVATAR: avatarData,
+            WHATSAPP_NAME: contact.name,
+            WHATSAPP_SHORTNAME: contact.shortName,
+            WHATSAPP_PUSHNAME: contact.pushname,
+            WHATSAPP_BLOCKED: contact.isBlocked,
+            WHATSAPP_KNOWN: isContactKnown
+        };
+        console.log("CONTACT INF:", ContactINF);
+        console.log("chatname: ", chat.name);
+    
+        await db.contactattrs_txn(ContactINF, ContactID);
     }
 });
-
 
 client.on('message', async (message) => {
     let cmdstr = message.body.split(" ")[0];

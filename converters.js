@@ -26,7 +26,6 @@ function bodyBlobB64JSON (bodyBase64) {
 function filesJSON (fileName, mimeType, blobID, size, csize, sha512, contentID) {
     let retval;
     const ext =  '.' + fileType(mimeType);
-    console.log("extension: ", ext);
     if (fileName === null || fileName === undefined || fileName === "") {
         retval = [["Unnamed Attachment"+ext, mimeType, [blobID, String(size), String(csize), String(sha512)], String(contentID),""]];
     } else {
@@ -38,7 +37,6 @@ function filesJSON (fileName, mimeType, blobID, size, csize, sha512, contentID) 
 function filesB64JSON (fileName, mimeType, data) {
     let retval;
     const ext =  '.' + fileType(mimeType);
-    console.log("extension: ", ext);
     if (fileName === null || fileName === undefined || fileName === "") {
         retval = [["Unnamed Attachment" + ext, String(mimeType), [String(data)], "", ""]];
     }
@@ -57,7 +55,6 @@ function insertCharacterAtIndex(text) {
     text = text.substring(0, 9) + '/' + text.substring(9);
     text = text.substring(0, 6) + '/' + text.substring(6);
     text = text.substring(0, 3) + '/' + text.substring(3);
-    console.log("PATH : " , text);
     return text;
 }
 

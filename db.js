@@ -32,7 +32,6 @@ function closeDatabase(db) {
 
 async function add_message_txn (uuid, mimeID, timestamp, sender, recipient, files, irtMUUID, mimeQuoted, header, preview, bodyBlob) {
   try {
-    console.log("MESSAGE UUID: ", uuid);
     const date = new Date(timestamp*1000);
     let body_type = [['body-enc', 'UTF-8']];
     body_type = JSON.stringify(body_type);
@@ -53,8 +52,6 @@ async function add_message_txn (uuid, mimeID, timestamp, sender, recipient, file
     )});
 
     await closeDatabase(db_main);
-
-    console.log("add_msg_tsx CALİSTİ!!!");
     return rows2;
   } catch (err) {
     console.error(err.message);
@@ -128,11 +125,8 @@ async function mbody_txn(uuid, messageBody) {
 }
 
 async function getMessageIRT(mimeID) {
-  console.log("1");
   const db_main = await openDatabase('main.db');
-  console.log("2");
   const row = await new Promise ((resolve, reject) => {
-    console.log("2.1");
     db_main.get("SELECT uuid FROM messages WHERE mime_id = ?;", [mimeID], (err, row) => {
       console.log("2.2", err, row);
       if (err) {
@@ -142,9 +136,7 @@ async function getMessageIRT(mimeID) {
       }
     });
   });
-  console.log("3");
   await closeDatabase(db_main);
-  console.log("ROW: ", row);
   return row.uuid;
 }
 
@@ -161,7 +153,6 @@ async function quotedMessageIsInDb (mime_id){
       }
     })
   });
-  console.log("row.mimeID:", row.mimeID);
   if (row.mimeID === 0){
     return null;
   }
@@ -226,7 +217,6 @@ async function UpdateContents (uuid, hash) {
   db_contents.run("INSERT INTO blobs (partype, parid, parsubid, blob_id, size, csize, sha512, data_id) VALUES (?,?,?,?,?,?,?,?) RETURNING *", [row.partype, uuid, row.parid, row.blob_id, row.size, row.csize, row.sha512, row.data_id]);
 
   await closeDatabase(db_contents);
-  console.log("ROW: ", row);  
   return row;
 }
 
@@ -253,7 +243,6 @@ async function contentsAll_txn (uuid, RawData, cid, partype) {
   let type;
   let data;
   const db_contents = await openDatabase('blob1/contents.db');
-  console.log(await doesExistInContents(hash_SHA512));
   const sizeInBytes = new TextEncoder().encode(RawData).byteLength;
   if (sizeInBytes <= 512) {
     await closeDatabase(db_contents);
@@ -310,7 +299,6 @@ async function contentsAll_txn (uuid, RawData, cid, partype) {
 }
 
 async function contactattrs_txn (contact, cid) {
-  console.log("contact info acildi");
   const db_main = await openDatabase('main.db');
   db_main.serialize(function() {
     db_main.run("DELETE FROM contactattrs WHERE cid = ?", [cid]);

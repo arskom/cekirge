@@ -36,9 +36,9 @@ const db = require ('./db.js');
 const convert = require ('./converters');
 const uuidv4 = require('uuid').v4;
 const crypto = require('crypto');
-//const Buffer = ('node:buffer');
 const { TextEncoder } = require('util');
 const axios = require('axios');
+const { unescape } = require('node:querystring');
 
 /*
  * cercop
@@ -195,6 +195,12 @@ client.on('message_create', async (message) => {
         return;
     }
 
+    let ClientPushname;
+    if (client.info.pushname === null && client.info.pushname === undefined) {
+        ClientPushname = '';
+    } else {
+        ClientPushname = client.info.pushname;
+    }
     let chat = await message.getChat();
     let contact = await message.getContact();
 
@@ -203,22 +209,10 @@ client.on('message_create', async (message) => {
     log.debug(message);
     log.message(preamble, message.body); 
 
-    let fromName = '';
-    let toName = '';
-    let sender = '';
-    let recipient = '';
-    if(message.fromMe){
-        fromName = client.info.pushname;
-        toName = chat.name;
-    } else {
-        fromName = chat.name;
-        toName = client.info.pushname;
-    }
-    sender = convert.SenderOrRecipientJSON(message.from, fromName);
-    recipient = convert.SenderOrRecipientJSON(message.to, toName);
-
     let rd_uuidv = '{' + uuidv4() + '}';
     const folderUUID = '{' + uuidv4() + '}';
+    console.log("Message UUID: ", rd_uuidv);
+    console.log("Folder UUID: ", folderUUID);
 
     let irtMUUID = '{00000000-0000-0000-0000-000000000000}';
     let quotedMsg_MIME_ID = null;
@@ -230,11 +224,28 @@ client.on('message_create', async (message) => {
     }
 
     let header = '[]';
+    let fromName = '';
+    let toName = '';
+    let sender = '';
+    let recipient = '';
     if (chat.isGroup){
-        header = convert.hd4Groups(message.from, fromName, message.to, toName, chat.name);
+        if(message.fromMe){
+            header = convert.hd4Groups(message.from, client.pushname, chat.id._serialized, chat.name, chat.name);   
+        } else {
+            header = convert.hd4Groups((await message.getContact()).id._serialized, message.author, chat.id._serialized, chat.name, chat.name);    
+        }
     } else {
+        if(message.fromMe){
+            fromName = ClientPushname;
+            toName = chat.name;
+        } else {
+            fromName = chat.name;
+            toName = ClientPushname;
+        }
         header = convert.hd4Direct(message.from, fromName, message.to);
     }
+    sender = convert.SenderOrRecipientJSON(message.from, fromName);
+    recipient = convert.SenderOrRecipientJSON(message.to, toName);
     
     // If message is not empty, do fill body_blob and preview columns in database
     let bodyBlob = null;
@@ -259,7 +270,6 @@ client.on('message_create', async (message) => {
         const fmimetype = (await message.downloadMedia()).mimetype;
         const media_data = (await message.downloadMedia()).data;
         const ffilename = (await message.downloadMedia()).fileName;
-        console.log("ffilename: ", ffilename);
         const fSHA512 = crypto.createHash('sha512').update(media_data).digest('base64');
 
         const contentF = await db.contentsAll_txn(rd_uuidv, media_data, 3, 2);
